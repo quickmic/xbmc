@@ -17,7 +17,7 @@
 #include "cores/AudioEngine/Utils/AEUtil.h"
 
 extern "C" {
-#include "libavutil/opt.h"
+#include <libavutil/opt.h>
 }
 
 CDVDAudioCodecFFmpeg::CDVDAudioCodecFFmpeg(CProcessInfo &processInfo) : CDVDAudioCodec(processInfo)
@@ -41,7 +41,7 @@ bool CDVDAudioCodecFFmpeg::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options
 {
   if (hints.cryptoSession)
   {
-    CLog::Log(LOGERROR,"CDVDAudioCodecFFmpeg::Open() CryptoSessions unsuppoted!");
+    CLog::Log(LOGERROR,"CDVDAudioCodecFFmpeg::Open() CryptoSessions unsupported!");
     return false;
   }
 

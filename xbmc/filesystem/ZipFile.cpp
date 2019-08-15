@@ -7,6 +7,7 @@
  */
 
 #include "ZipFile.h"
+
 #include "URL.h"
 #include "utils/URIUtils.h"
 #include "utils/auto_buffer.h"
@@ -14,9 +15,6 @@
 
 #include <sys/stat.h>
 
-#if defined (TARGET_WINDOWS)
-#pragma comment(lib, "zlib.lib")
-#endif
 #define ZIP_CACHE_LIMIT 4*1024*1024
 
 using namespace XFILE;

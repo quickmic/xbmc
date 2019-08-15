@@ -8,22 +8,19 @@
 
 #include "CharsetConverter.h"
 
-#include <algorithm>
-
-#ifndef TARGET_FREEBSD
-#include <iconv.h>
-#elif TARGET_FREEBSD
-#include "/usr/include/iconv.h"
-#endif
-#include <fribidi/fribidi.h>
-
-#include "guilib/LocalizeStrings.h"
 #include "LangInfo.h"
+#include "guilib/LocalizeStrings.h"
 #include "log.h"
-#include "settings/lib/Setting.h"
 #include "settings/Settings.h"
+#include "settings/lib/Setting.h"
+#include "settings/lib/SettingDefinitions.h"
 #include "utils/StringUtils.h"
 #include "utils/Utf8Utils.h"
+
+#include <algorithm>
+
+#include <fribidi.h>
+#include <iconv.h>
 
 #ifdef WORDS_BIGENDIAN
   #define ENDIAN_SUFFIX "BE"
@@ -43,11 +40,6 @@
   #define UTF32_CHARSET "UTF-32" ENDIAN_SUFFIX
   #define UTF8_SOURCE "UTF-8"
   #define WCHAR_CHARSET UTF16_CHARSET
-#if _DEBUG && !defined(TARGET_WINDOWS_STORE)
-  #pragma comment(lib, "libiconvd.lib")
-#else
-  #pragma comment(lib, "libiconv.lib")
-#endif
 #elif defined(TARGET_FREEBSD)
   #define WCHAR_IS_UCS_4 1
   #define UTF16_CHARSET "UTF-16" ENDIAN_SUFFIX
@@ -389,7 +381,7 @@ bool CCharsetConverter::CInnerConverter::convert(iconv_t type, int multiplier, c
   char*       outBufStart   = outBuf;     //where in out output buffer iconv() should start writing
 
   size_t returnV;
-  while(1)
+  while(true)
   {
     //iconv() will update inBufStart, inBytesAvail, outBufStart and outBytesAvail
     returnV = iconv(type, charPtrPtrAdapter(&inBufStart), &inBytesAvail, &outBufStart, &outBytesAvail);
@@ -849,12 +841,12 @@ bool CCharsetConverter::utf8logicalToVisualBiDi(const std::string& utf8StringSrc
   return CInnerConverter::stdConvert(Utf32ToUtf8, utf32flipped, utf8StringDst, failOnBadString);
 }
 
-void CCharsetConverter::SettingOptionsCharsetsFiller(SettingConstPtr setting, std::vector< std::pair<std::string, std::string> >& list, std::string& current, void *data)
+void CCharsetConverter::SettingOptionsCharsetsFiller(SettingConstPtr setting, std::vector<StringSettingOption>& list, std::string& current, void *data)
 {
   std::vector<std::string> vecCharsets = g_charsetConverter.getCharsetLabels();
   sort(vecCharsets.begin(), vecCharsets.end(), sortstringbyname());
 
-  list.push_back(make_pair(g_localizeStrings.Get(13278), "DEFAULT")); // "Default"
+  list.push_back(StringSettingOption(g_localizeStrings.Get(13278), "DEFAULT")); // "Default"
   for (int i = 0; i < (int) vecCharsets.size(); ++i)
-    list.push_back(make_pair(vecCharsets[i], g_charsetConverter.getCharsetNameByLabel(vecCharsets[i])));
+    list.push_back(StringSettingOption(vecCharsets[i], g_charsetConverter.getCharsetNameByLabel(vecCharsets[i])));
 }

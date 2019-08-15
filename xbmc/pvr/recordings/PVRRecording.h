@@ -24,21 +24,25 @@
  *
  */
 
+#include "XBDateTime.h"
+#include "pvr/PVRTypes.h"
+#include "threads/SystemClock.h"
+#include "video/Bookmark.h"
+#include "video/VideoInfoTag.h"
+
+#include <memory>
 #include <string>
 #include <vector>
 
-#include "XBDateTime.h"
-#include "addons/kodi-addon-dev-kit/include/kodi/xbmc_pvr_types.h"
-#include "threads/SystemClock.h"
-#include "video/VideoInfoTag.h"
-
-#include "pvr/PVRTypes.h"
-
 class CVideoDatabase;
-class CVariant;
+
+struct PVR_EDL_ENTRY;
+struct PVR_RECORDING;
 
 namespace PVR
 {
+  class CPVRTimerInfoTag;
+
   /*!
    * @brief Representation of a CPVRRecording unique ID.
    */
@@ -93,11 +97,6 @@ namespace PVR
      * @return True if it was deleted successfully, false otherwise.
      */
     bool Delete(void);
-
-    /*!
-     * @brief Called when this recording has been deleted
-     */
-    void OnDelete(void);
 
     /*!
      * @brief Undelete this recording on the client (if supported).
@@ -279,6 +278,12 @@ namespace PVR
      * @return true if the recording is in progress, false otherwise
      */
     bool IsInProgress() const;
+
+    /*!
+     * @brief return the timer for an in-progress recording, if any
+     * @return the timer if the recording is in progress, nullptr otherwise
+     */
+    std::shared_ptr<CPVRTimerInfoTag> GetRecordingTimer() const;
 
     /*!
     * @brief set the genre for this recording.

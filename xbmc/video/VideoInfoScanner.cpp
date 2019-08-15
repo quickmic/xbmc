@@ -8,47 +8,47 @@
 
 #include "VideoInfoScanner.h"
 
-#include <algorithm>
-#include <utility>
-
+#include "FileItem.h"
+#include "GUIInfoManager.h"
+#include "GUIUserMessages.h"
+#include "NfoFile.h"
 #include "ServiceBroker.h"
+#include "TextureCache.h"
+#include "URL.h"
+#include "Util.h"
+#include "VideoInfoDownloader.h"
 #include "dialogs/GUIDialogExtendedProgressBar.h"
 #include "dialogs/GUIDialogProgress.h"
 #include "events/EventLog.h"
 #include "events/MediaLibraryEvent.h"
-#include "FileItem.h"
 #include "filesystem/Directory.h"
 #include "filesystem/DirectoryCache.h"
 #include "filesystem/File.h"
 #include "filesystem/MultiPathDirectory.h"
 #include "filesystem/PluginDirectory.h"
-#include "GUIInfoManager.h"
 #include "guilib/GUIComponent.h"
 #include "guilib/GUIWindowManager.h"
 #include "guilib/LocalizeStrings.h"
-#include "GUIUserMessages.h"
 #include "interfaces/AnnouncementManager.h"
 #include "messaging/helpers/DialogHelper.h"
 #include "messaging/helpers/DialogOKHelper.h"
-#include "NfoFile.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
-#include "TextureCache.h"
+#include "tags/VideoInfoTagLoaderFactory.h"
 #include "threads/SystemClock.h"
-#include "URL.h"
-#include "Util.h"
 #include "utils/Digest.h"
 #include "utils/FileExtensionProvider.h"
-#include "utils/log.h"
 #include "utils/RegExp.h"
 #include "utils/StringUtils.h"
 #include "utils/URIUtils.h"
 #include "utils/Variant.h"
+#include "utils/log.h"
 #include "video/VideoLibraryQueue.h"
 #include "video/VideoThumbLoader.h"
-#include "VideoInfoDownloader.h"
-#include "tags/VideoInfoTagLoaderFactory.h"
+
+#include <algorithm>
+#include <utility>
 
 using namespace XFILE;
 using namespace ADDON;
@@ -812,8 +812,11 @@ namespace VIDEO
 
       if (updateSeasonArt)
       {
-        CVideoInfoDownloader loader(scraper);
-        loader.GetArtwork(showInfo);
+        if (!item->IsPlugin() || scraper->ID() != "metadata.local")
+        {
+          CVideoInfoDownloader loader(scraper);
+          loader.GetArtwork(showInfo);
+        }
         GetSeasonThumbs(showInfo, seasonArt, CVideoThumbLoader::GetArtTypes(MediaTypeSeason), useLocal && !item->IsPlugin());
         for (std::map<int, std::map<std::string, std::string> >::const_iterator i = seasonArt.begin(); i != seasonArt.end(); ++i)
         {
@@ -1504,8 +1507,8 @@ namespace VIDEO
         continue;
       std::string aspect = url.m_aspect;
       if (aspect.empty())
-        // temporary support for XML music video scrapers that share music album scraper bits
-        aspect = content == CONTENT_MUSICVIDEOS ? "poster" : "thumb";
+        // Backward compatibility with Kodi 11 Eden NFO files
+        aspect = ContentToMediaType(content, pItem->m_bIsFolder) == MediaTypeEpisode ? "thumb" : "poster";
       if (find(artTypes.begin(), artTypes.end(), aspect) == artTypes.end() || art.find(aspect) != art.end())
         continue;
       std::string image = GetImage(url, pItem->GetPath());

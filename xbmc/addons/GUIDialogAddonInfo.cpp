@@ -8,22 +8,25 @@
 
 #include "GUIDialogAddonInfo.h"
 
+#include "AddonDatabase.h"
+#include "FileItem.h"
+#include "GUIPassword.h"
+#include "ServiceBroker.h"
+#include "Util.h"
 #include "addons/AddonInstaller.h"
 #include "addons/AddonManager.h"
 #include "addons/AddonSystemSettings.h"
-#include "AddonDatabase.h"
-#include "FileItem.h"
-#include "ServiceBroker.h"
-#include "filesystem/Directory.h"
 #include "addons/settings/GUIDialogAddonSettings.h"
 #include "dialogs/GUIDialogContextMenu.h"
 #include "dialogs/GUIDialogSelect.h"
 #include "dialogs/GUIDialogYesNo.h"
+#include "filesystem/Directory.h"
 #include "games/GameUtils.h"
-#include "guilib/LocalizeStrings.h"
 #include "guilib/GUIComponent.h"
 #include "guilib/GUIWindowManager.h"
+#include "guilib/LocalizeStrings.h"
 #include "input/Key.h"
+#include "interfaces/builtins/Builtins.h"
 #include "messaging/helpers/DialogHelper.h"
 #include "messaging/helpers/DialogOKHelper.h"
 #include "pictures/GUIWindowSlideShow.h"
@@ -32,11 +35,8 @@
 #include "utils/Digest.h"
 #include "utils/JobManager.h"
 #include "utils/StringUtils.h"
-#include "utils/log.h"
 #include "utils/Variant.h"
-#include "GUIPassword.h"
-#include "Util.h"
-#include "interfaces/builtins/Builtins.h"
+#include "utils/log.h"
 
 #include <functional>
 #include <sstream>
@@ -55,7 +55,6 @@ using namespace KODI;
 using namespace ADDON;
 using namespace XFILE;
 using namespace KODI::MESSAGING;
-using KODI::MESSAGING::HELPERS::DialogResponse;
 
 CGUIDialogAddonInfo::CGUIDialogAddonInfo(void)
   : CGUIDialog(WINDOW_DIALOG_ADDON_INFO, "DialogAddonInfo.xml")
@@ -229,13 +228,13 @@ int CGUIDialogAddonInfo::AskForVersion(std::vector<std::pair<AddonVersion, std::
     if (versionInfo.second == LOCAL_CACHE)
     {
       item.SetLabel2(g_localizeStrings.Get(24095));
-      item.SetIconImage("DefaultAddonRepository.png");
+      item.SetArt("icon", "DefaultAddonRepository.png");
       dialog->Add(item);
     }
     else if (CServiceBroker::GetAddonMgr().GetAddon(versionInfo.second, repo, ADDON_REPOSITORY))
     {
       item.SetLabel2(repo->Name());
-      item.SetIconImage(repo->Icon());
+      item.SetArt("icon", repo->Icon());
       dialog->Add(item);
     }
   }
@@ -498,7 +497,7 @@ bool CGUIDialogAddonInfo::ShowDependencyList(const std::vector<ADDON::Dependency
                                           g_localizeStrings.Get(39018).c_str());
 
       item->SetLabel2(str.str());
-      item->SetIconImage(info_addon->Icon());
+      item->SetArt("icon", info_addon->Icon());
       item->SetProperty("addon_id", it.id);
       items.Add(item);
     }

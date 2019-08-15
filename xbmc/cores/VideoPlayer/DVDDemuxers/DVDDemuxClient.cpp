@@ -6,11 +6,12 @@
  *  See LICENSES/README.md for more information.
  */
 
-#include "DVDInputStreams/DVDInputStream.h"
 #include "DVDDemuxClient.h"
+
 #include "DVDDemuxUtils.h"
-#include "utils/log.h"
+#include "DVDInputStreams/DVDInputStream.h"
 #include "cores/VideoPlayer/Interface/Addon/TimingConstants.h"
+#include "utils/log.h"
 
 #define FF_MAX_EXTRADATA_SIZE ((1 << 28) - AV_INPUT_BUFFER_PADDING_SIZE)
 
@@ -608,6 +609,8 @@ std::string CDVDDemuxClient::GetStreamCodecName(int iStreamId)
       strName = "vp8";
     else if (stream->codec == AV_CODEC_ID_VP9)
       strName = "vp9";
+    else if (stream->codec == AV_CODEC_ID_HEVC)
+      strName = "hevc";
   }
   return strName;
 }
@@ -628,6 +631,14 @@ void CDVDDemuxClient::SetSpeed (int speed)
   if (m_IDemux)
   {
     m_IDemux->SetSpeed(speed);
+  }
+}
+
+void CDVDDemuxClient::FillBuffer(bool mode)
+{
+  if (m_IDemux)
+  {
+    m_IDemux->FillBuffer(mode);
   }
 }
 

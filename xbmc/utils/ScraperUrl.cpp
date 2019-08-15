@@ -6,20 +6,21 @@
  *  See LICENSES/README.md for more information.
  */
 
-#include "XMLUtils.h"
 #include "ScraperUrl.h"
-#include "ServiceBroker.h"
-#include "settings/AdvancedSettings.h"
-#include "settings/SettingsComponent.h"
+
 #include "CharsetConverter.h"
-#include "utils/CharsetDetection.h"
-#include "utils/StringUtils.h"
+#include "ServiceBroker.h"
+#include "URIUtils.h"
 #include "URL.h"
+#include "XMLUtils.h"
 #include "filesystem/CurlFile.h"
 #include "filesystem/ZipFile.h"
-#include "URIUtils.h"
-#include "utils/XBMCTinyXML.h"
+#include "settings/AdvancedSettings.h"
+#include "settings/SettingsComponent.h"
+#include "utils/CharsetDetection.h"
 #include "utils/Mime.h"
+#include "utils/StringUtils.h"
+#include "utils/XBMCTinyXML.h"
 #include "utils/log.h"
 
 #include <algorithm>
@@ -139,7 +140,7 @@ const CScraperUrl::SUrlEntry CScraperUrl::GetFirstThumb(const std::string &type)
 {
   for (std::vector<SUrlEntry>::const_iterator iter=m_url.begin();iter != m_url.end();++iter)
   {
-    if (iter->m_type == URL_TYPE_GENERAL && (type.empty() || type == "thumb" || iter->m_aspect == type))
+    if (iter->m_type == URL_TYPE_GENERAL && (type.empty() || iter->m_aspect == type))
       return *iter;
   }
 
@@ -184,9 +185,6 @@ bool CScraperUrl::Get(const SUrlEntry& scrURL, std::string& strHTML, XFILE::CCur
   CURL url(scrURL.m_url);
   http.SetReferer(scrURL.m_spoof);
   std::string strCachePath;
-
-  if (scrURL.m_isgz)
-    http.SetAcceptEncoding("gzip");
 
   if (!scrURL.m_cache.empty())
   {
@@ -328,7 +326,7 @@ bool CScraperUrl::ParseEpisodeGuide(std::string strUrls)
   return true;
 }
 
-void CScraperUrl::AddElement(std::string url, std::string aspect, std::string referrer, std::string cache, bool post, bool isgz, int season)
+void CScraperUrl::AddElement(std::string url, std::string aspect, std::string preview, std::string referrer, std::string cache, bool post, bool isgz, int season)
 {
   TiXmlElement thumb("thumb");
   thumb.SetAttribute("spoof", referrer);
@@ -343,6 +341,7 @@ void CScraperUrl::AddElement(std::string url, std::string aspect, std::string re
     thumb.SetAttribute("type", "season");
   }
   thumb.SetAttribute("aspect", aspect);
+  thumb.SetAttribute("preview", preview);
   TiXmlText text(url);
   thumb.InsertEndChild(text);
   m_xml << thumb;
@@ -377,7 +376,7 @@ void CScraperUrl::GetThumbURLs(std::vector<std::string> &thumbs, const std::stri
 {
   for (std::vector<SUrlEntry>::const_iterator iter = m_url.begin(); iter != m_url.end(); ++iter)
   {
-    if (iter->m_aspect == type || type.empty() || type == "thumb" || iter->m_aspect.empty())
+    if (iter->m_aspect == type || type.empty() || iter->m_aspect.empty())
     {
       if ((iter->m_type == CScraperUrl::URL_TYPE_GENERAL && season == -1)
        || (iter->m_type == CScraperUrl::URL_TYPE_SEASON && iter->m_season == season))

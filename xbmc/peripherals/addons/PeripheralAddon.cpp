@@ -7,20 +7,21 @@
  */
 
 #include "PeripheralAddon.h"
+
 #include "PeripheralAddonTranslator.h"
 #include "addons/AddonManager.h"
 #include "filesystem/Directory.h"
 #include "filesystem/SpecialProtocol.h"
 #include "games/controllers/Controller.h"
 #include "games/controllers/ControllerManager.h"
-#include "input/joysticks/interfaces/IButtonMap.h"
 #include "input/joysticks/DriverPrimitive.h"
+#include "input/joysticks/interfaces/IButtonMap.h"
 #include "peripherals/Peripherals.h"
 #include "peripherals/bus/virtual/PeripheralBusAddon.h"
 #include "peripherals/devices/PeripheralJoystick.h"
 #include "threads/SingleLock.h"
-#include "utils/log.h"
 #include "utils/StringUtils.h"
+#include "utils/log.h"
 
 #include <algorithm>
 #include <string.h>
@@ -312,7 +313,7 @@ void CPeripheralAddon::GetDirectory(const std::string &strPath, CFileItemList &i
     peripheralFile->SetProperty("location", peripheral->Location());
     peripheralFile->SetProperty("class", PeripheralTypeTranslator::TypeToString(peripheral->Type()));
     peripheralFile->SetProperty("version", peripheral->GetVersionInfo());
-    peripheralFile->SetIconImage(peripheral->GetIcon());
+    peripheralFile->SetArt("icon", peripheral->GetIcon());
     items.Add(peripheralFile);
   }
 }

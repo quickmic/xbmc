@@ -8,33 +8,31 @@
 
 #include "VideoDatabase.h"
 
-#include <algorithm>
-#include <map>
-#include <memory>
-#include <string>
-#include <vector>
-
-#include "video/VideoInfoTag.h"
-#include "addons/AddonManager.h"
 #include "Application.h"
+#include "FileItem.h"
+#include "GUIInfoManager.h"
+#include "GUIPassword.h"
 #include "ServiceBroker.h"
+#include "TextureCache.h"
+#include "URL.h"
+#include "Util.h"
+#include "VideoInfoScanner.h"
+#include "XBDateTime.h"
+#include "addons/AddonManager.h"
 #include "dbwrappers/dataset.h"
 #include "dialogs/GUIDialogExtendedProgressBar.h"
 #include "dialogs/GUIDialogKaiToast.h"
 #include "dialogs/GUIDialogProgress.h"
 #include "dialogs/GUIDialogYesNo.h"
-#include "FileItem.h"
 #include "filesystem/Directory.h"
 #include "filesystem/File.h"
 #include "filesystem/MultiPathDirectory.h"
 #include "filesystem/PluginDirectory.h"
 #include "filesystem/StackDirectory.h"
-#include "guilib/guiinfo/GUIInfoLabels.h"
-#include "GUIInfoManager.h"
 #include "guilib/GUIComponent.h"
 #include "guilib/GUIWindowManager.h"
 #include "guilib/LocalizeStrings.h"
-#include "GUIPassword.h"
+#include "guilib/guiinfo/GUIInfoLabels.h"
 #include "interfaces/AnnouncementManager.h"
 #include "messaging/helpers/DialogOKHelper.h"
 #include "playlists/SmartPlayList.h"
@@ -45,22 +43,24 @@
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
 #include "storage/MediaManager.h"
-#include "TextureCache.h"
 #include "threads/SystemClock.h"
-#include "URL.h"
-#include "Util.h"
 #include "utils/FileUtils.h"
 #include "utils/GroupUtils.h"
 #include "utils/LabelFormatter.h"
-#include "utils/log.h"
 #include "utils/StringUtils.h"
 #include "utils/URIUtils.h"
 #include "utils/Variant.h"
 #include "utils/XMLUtils.h"
+#include "utils/log.h"
 #include "video/VideoDbUrl.h"
+#include "video/VideoInfoTag.h"
 #include "video/windows/GUIWindowVideoBase.h"
-#include "VideoInfoScanner.h"
-#include "XBDateTime.h"
+
+#include <algorithm>
+#include <map>
+#include <memory>
+#include <string>
+#include <vector>
 
 using namespace dbiplus;
 using namespace XFILE;
@@ -3621,7 +3621,7 @@ int CVideoDatabase::GetDbId(const std::string &query)
 
 void CVideoDatabase::DeleteStreamDetails(int idFile)
 {
-    m_pDS->exec(PrepareSQL("delete from streamdetails where idFile=%i", idFile));
+  m_pDS->exec(PrepareSQL("DELETE FROM streamdetails WHERE idFile = %i", idFile));
 }
 
 void CVideoDatabase::DeleteSet(int idSet)
@@ -4159,6 +4159,9 @@ CVideoInfoTag CVideoDatabase::GetDetailsForMusicVideo(const dbiplus::sql_record*
 {
   CVideoInfoTag details;
 
+  if (record == nullptr)
+    return details;
+
   unsigned int time = XbmcThreads::SystemClockMillis();
   int idMVideo = record->at(0).get_asInt();
 
@@ -4663,6 +4666,117 @@ bool CVideoDatabase::GetArtTypes(const MediaType &mediaType, std::vector<std::st
     CLog::Log(LOGERROR, "%s(%s) failed", __FUNCTION__, mediaType.c_str());
   }
   return false;
+}
+
+namespace
+{
+std::vector<std::string> GetBasicItemAvailableArtTypes(const CVideoInfoTag& tag)
+{
+  std::vector<std::string> result;
+
+  //! @todo artwork: fanart stored separately, doesn't need to be
+  if (tag.m_fanart.GetNumFanarts() && std::find(result.cbegin(), result.cend(), "fanart") == result.cend())
+    result.push_back("fanart");
+
+  // all other images
+  for (const auto& urlEntry : tag.m_strPictureURL.m_url)
+  {
+    std::string artType = urlEntry.m_aspect;
+    if (artType.empty())
+      artType = tag.m_type == MediaTypeEpisode ? "thumb" : "poster";
+    if (urlEntry.m_type == CScraperUrl::URL_TYPE_GENERAL && // exclude season artwork for TV shows
+      !StringUtils::StartsWith(artType, "set.") && // exclude movie set artwork for movies
+      std::find(result.cbegin(), result.cend(), artType) == result.cend())
+    {
+      result.push_back(artType);
+    }
+  }
+  return result;
+}
+
+std::vector<std::string> GetSeasonAvailableArtTypes(int mediaId, CVideoDatabase& db)
+{
+  CVideoInfoTag tag;
+  db.GetSeasonInfo(mediaId, tag);
+
+  std::vector<std::string> result;
+
+  CVideoInfoTag sourceShow;
+  db.GetTvShowInfo("", sourceShow, tag.m_iIdShow);
+  for (const auto& urlEntry : sourceShow.m_strPictureURL.m_url)
+  {
+    std::string artType = urlEntry.m_aspect;
+    if (artType.empty())
+      artType = "poster";
+    if (urlEntry.m_type == CScraperUrl::URL_TYPE_SEASON && urlEntry.m_season == tag.m_iSeason &&
+      std::find(result.cbegin(), result.cend(), artType) == result.cend())
+    {
+      result.push_back(artType);
+    }
+  }
+  return result;
+}
+
+std::vector<std::string> GetMovieSetAvailableArtTypes(int mediaId, CVideoDatabase& db)
+{
+  std::vector<std::string> result;
+  CFileItemList items;
+  std::string baseDir = StringUtils::Format("videodb://movies/sets/%d", mediaId);
+  if (db.GetMoviesNav(baseDir, items))
+  {
+    for (const auto& item : items)
+    {
+      CVideoInfoTag* pTag = item->GetVideoInfoTag();
+      pTag->m_strPictureURL.Parse();
+      //! @todo artwork: fanart stored separately, doesn't need to be
+      pTag->m_fanart.Unpack();
+      if (pTag->m_fanart.GetNumFanarts() &&
+        std::find(result.cbegin(), result.cend(), "fanart") == result.cend())
+      {
+        result.push_back("fanart");
+      }
+
+      // all other images
+      for (const auto& urlEntry : pTag->m_strPictureURL.m_url)
+      {
+        std::string artType = urlEntry.m_aspect;
+        if (artType.empty())
+          artType = "poster";
+        else if (StringUtils::StartsWith(artType, "set."))
+          artType = artType.substr(4);
+
+        if (std::find(result.cbegin(), result.cend(), artType) == result.cend())
+          result.push_back(artType);
+      }
+    }
+  }
+  return result;
+}
+}
+
+std::vector<std::string> CVideoDatabase::GetAvailableArtTypesForItem(int mediaId,
+  const MediaType& mediaType)
+{
+  VIDEODB_CONTENT_TYPE dbType{VIDEODB_CONTENT_UNKNOWN};
+  if (mediaType == MediaTypeTvShow)
+    dbType = VIDEODB_CONTENT_TVSHOWS;
+  else if (mediaType == MediaTypeMovie)
+    dbType = VIDEODB_CONTENT_MOVIES;
+  else if (mediaType == MediaTypeEpisode)
+    dbType = VIDEODB_CONTENT_EPISODES;
+  else if (mediaType == MediaTypeMusicVideo)
+    dbType = VIDEODB_CONTENT_MUSICVIDEOS;
+
+  if (dbType != VIDEODB_CONTENT_UNKNOWN)
+  {
+    CVideoInfoTag tag = GetDetailsByTypeAndId(dbType, mediaId);
+    return GetBasicItemAvailableArtTypes(tag);
+  }
+  if (mediaType == MediaTypeSeason)
+    return GetSeasonAvailableArtTypes(mediaId, *this);
+  if (mediaType == MediaTypeVideoCollection)
+    return GetMovieSetAvailableArtTypes(mediaId, *this);
+  return {};
 }
 
 /// \brief GetStackTimes() obtains any saved video times for the stacked file
@@ -5793,7 +5907,7 @@ void CVideoDatabase::EraseVideoSettings(const CFileItem &item)
   {
     std::string sql = PrepareSQL("DELETE FROM settings WHERE idFile=%i", idFile);
 
-    CLog::Log(LOGINFO, "Deleting settings information for files %s", item.GetPath().c_str());
+    CLog::Log(LOGINFO, "Deleting settings information for files %s", CURL::GetRedacted(CURL::GetRedacted(item.GetPath()).c_str()));
     m_pDS->exec(sql);
   }
   catch (...)
@@ -6249,9 +6363,9 @@ bool CVideoDatabase::GetActorsNav(const std::string& strBaseDir, CFileItemList& 
     {
       CFileItemPtr pItem = items[i];
       if (idContent == VIDEODB_CONTENT_MUSICVIDEOS)
-        pItem->SetIconImage("DefaultArtist.png");
+        pItem->SetArt("icon", "DefaultArtist.png");
       else
-        pItem->SetIconImage("DefaultActor.png");
+        pItem->SetArt("icon", "DefaultActor.png");
     }
     return true;
   }
@@ -6574,7 +6688,8 @@ bool CVideoDatabase::GetYearsNav(const std::string& strBaseDir, CFileItemList& i
         {
           CDateTime time;
           time.SetFromDateString(dateString);
-          lYear = time.GetYear();
+          if (time.IsValid())
+            lYear = time.GetYear();
         }
         auto it = mapYears.find(lYear);
         if (it == mapYears.end())
@@ -6622,8 +6737,11 @@ bool CVideoDatabase::GetYearsNav(const std::string& strBaseDir, CFileItemList& i
         {
           CDateTime time;
           time.SetFromDateString(strLabel);
-          lYear = time.GetYear();
-          strLabel = StringUtils::Format("%i", lYear);
+          if (time.IsValid())
+          {
+            lYear = time.GetYear();
+            strLabel = StringUtils::Format("%i", lYear);
+          }
         }
         if (lYear == 0)
         {

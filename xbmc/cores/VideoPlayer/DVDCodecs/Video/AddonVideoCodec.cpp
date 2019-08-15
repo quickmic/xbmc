@@ -7,12 +7,13 @@
  */
 
 #include "AddonVideoCodec.h"
+
 #include "addons/binary-addons/BinaryAddonBase.h"
+#include "cores/VideoPlayer/DVDCodecs/DVDCodecs.h"
 #include "cores/VideoPlayer/DVDStreamInfo.h"
 #include "cores/VideoPlayer/Interface/Addon/DemuxCrypto.h"
-#include "cores/VideoPlayer/DVDCodecs/DVDCodecs.h"
-#include "cores/VideoPlayer/Process/VideoBuffer.h"
 #include "cores/VideoPlayer/Interface/Addon/TimingConstants.h"
+#include "cores/VideoPlayer/Process/VideoBuffer.h"
 #include "utils/log.h"
 
 using namespace kodi::addon;
@@ -191,7 +192,7 @@ CDVDVideoCodec::VCReturn CAddonVideoCodec::GetPicture(VideoPicture* pVideoPictur
     pVideoPicture->iFlags = 0;
     pVideoPicture->chroma_position = 0;
     pVideoPicture->colorBits = 8;
-    pVideoPicture->color_primaries = 0;
+    pVideoPicture->color_primaries = AVColorPrimaries::AVCOL_PRI_UNSPECIFIED;
     pVideoPicture->color_range = 0;
     pVideoPicture->color_space = AVCOL_SPC_UNSPECIFIED;
     pVideoPicture->color_transfer = 0;

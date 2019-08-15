@@ -30,7 +30,7 @@
  * overview.
  */
 
-#define ADDON_GLOBAL_VERSION_MAIN                     "1.0.14"
+#define ADDON_GLOBAL_VERSION_MAIN                     "1.1.0"
 #define ADDON_GLOBAL_VERSION_MAIN_MIN                 "1.0.12"
 #define ADDON_GLOBAL_VERSION_MAIN_XML_ID              "kodi.binary.global.main"
 #define ADDON_GLOBAL_VERSION_MAIN_DEPENDS             "AddonBase.h" \
@@ -44,19 +44,19 @@
 #define ADDON_GLOBAL_VERSION_GENERAL_XML_ID           "kodi.binary.global.general"
 #define ADDON_GLOBAL_VERSION_GENERAL_DEPENDS          "General.h"
 
-#define ADDON_GLOBAL_VERSION_GUI                      "5.12.0"
-#define ADDON_GLOBAL_VERSION_GUI_MIN                  "5.10.0"
+#define ADDON_GLOBAL_VERSION_GUI                      "5.14.0"
+#define ADDON_GLOBAL_VERSION_GUI_MIN                  "5.14.0"
 #define ADDON_GLOBAL_VERSION_GUI_XML_ID               "kodi.binary.global.gui"
 #define ADDON_GLOBAL_VERSION_GUI_DEPENDS              "libKODI_guilib.h" \
                                                       "gui/"
 
-#define ADDON_GLOBAL_VERSION_AUDIOENGINE              "1.0.1"
-#define ADDON_GLOBAL_VERSION_AUDIOENGINE_MIN          "1.0.1"
+#define ADDON_GLOBAL_VERSION_AUDIOENGINE              "1.0.2"
+#define ADDON_GLOBAL_VERSION_AUDIOENGINE_MIN          "1.0.2"
 #define ADDON_GLOBAL_VERSION_AUDIOENGINE_XML_ID       "kodi.binary.global.audioengine"
 #define ADDON_GLOBAL_VERSION_AUDIOENGINE_DEPENDS      "AudioEngine.h"
 
-#define ADDON_GLOBAL_VERSION_FILESYSTEM               "1.0.2"
-#define ADDON_GLOBAL_VERSION_FILESYSTEM_MIN           "1.0.2"
+#define ADDON_GLOBAL_VERSION_FILESYSTEM               "1.0.3"
+#define ADDON_GLOBAL_VERSION_FILESYSTEM_MIN           "1.0.3"
 #define ADDON_GLOBAL_VERSION_FILESYSTEM_XML_ID        "kodi.binary.global.filesystem"
 #define ADDON_GLOBAL_VERSION_FILESYSTEM_DEPENDS       "Filesystem.h"
 
@@ -98,8 +98,8 @@
 #define ADDON_INSTANCE_VERSION_PERIPHERAL_DEPENDS     "addon-instance/Peripheral.h" \
                                                       "addon-instance/PeripheralUtils.h"
 
-#define ADDON_INSTANCE_VERSION_PVR                    "5.10.3"
-#define ADDON_INSTANCE_VERSION_PVR_MIN                "5.10.0"
+#define ADDON_INSTANCE_VERSION_PVR                    "6.0.0"
+#define ADDON_INSTANCE_VERSION_PVR_MIN                "6.0.0"
 #define ADDON_INSTANCE_VERSION_PVR_XML_ID             "kodi.binary.instance.pvr"
 #define ADDON_INSTANCE_VERSION_PVR_DEPENDS            "xbmc_pvr_dll.h" \
                                                       "xbmc_pvr_types.h" \
@@ -111,8 +111,8 @@
 #define ADDON_INSTANCE_VERSION_SCREENSAVER_XML_ID     "kodi.binary.instance.screensaver"
 #define ADDON_INSTANCE_VERSION_SCREENSAVER_DEPENDS    "addon-instance/Screensaver.h"
 
-#define ADDON_INSTANCE_VERSION_VFS                    "2.0.0"
-#define ADDON_INSTANCE_VERSION_VFS_MIN                "2.0.0"
+#define ADDON_INSTANCE_VERSION_VFS                    "2.1.0"
+#define ADDON_INSTANCE_VERSION_VFS_MIN                "2.1.0"
 #define ADDON_INSTANCE_VERSION_VFS_XML_ID             "kodi.binary.instance.vfs"
 #define ADDON_INSTANCE_VERSION_VFS_DEPENDS            "addon-instance/VFS.h"
 

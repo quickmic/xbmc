@@ -6,33 +6,32 @@
  *  See LICENSES/README.md for more information.
  */
 
-#include <string>
-
-#include <limits.h>
-
 #include "MediaSettings.h"
+
 #include "Application.h"
 #include "PlayListPlayer.h"
+#include "ServiceBroker.h"
 #include "cores/RetroPlayer/RetroPlayerUtils.h"
 #include "dialogs/GUIDialogFileBrowser.h"
-#include "settings/dialogs/GUIDialogLibExportSettings.h"
 #include "guilib/LocalizeStrings.h"
 #include "interfaces/AnnouncementManager.h"
 #include "interfaces/builtins/Builtins.h"
-#include "music/MusicDatabase.h"
-#include "music/MusicLibraryQueue.h"
 #include "messaging/helpers/DialogHelper.h"
-#include "ServiceBroker.h"
-#include "settings/lib/Setting.h"
+#include "music/MusicLibraryQueue.h"
 #include "settings/Settings.h"
+#include "settings/dialogs/GUIDialogLibExportSettings.h"
+#include "settings/lib/Setting.h"
 #include "storage/MediaManager.h"
 #include "threads/SingleLock.h"
-#include "utils/log.h"
 #include "utils/StringUtils.h"
+#include "utils/Variant.h"
 #include "utils/XBMCTinyXML.h"
 #include "utils/XMLUtils.h"
-#include "utils/Variant.h"
+#include "utils/log.h"
 #include "video/VideoDatabase.h"
+
+#include <limits.h>
+#include <string>
 
 using namespace KODI;
 using namespace KODI::MESSAGING;
@@ -315,10 +314,8 @@ void CMediaSettings::OnSettingAction(std::shared_ptr<const CSetting> setting)
 
     if (CGUIDialogFileBrowser::ShowAndGetFile(shares, "musicdb.xml", g_localizeStrings.Get(651) , path))
     {
-      CMusicDatabase musicdatabase;
-      musicdatabase.Open();
-      musicdatabase.ImportFromXML(path);
-      musicdatabase.Close();
+      // Import data to music library showing progress dialog
+      CMusicLibraryQueue::GetInstance().ImportLibrary(path, true);
     }
   }
   else if (settingId == CSettings::SETTING_VIDEOLIBRARY_CLEANUP)

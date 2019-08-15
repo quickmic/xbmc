@@ -7,24 +7,26 @@
  */
 
 #include "WinSystemGbm.h"
+
+#include "DRMAtomic.h"
+#include "DRMLegacy.h"
+#include "GBMDPMSSupport.h"
+#include "OffScreenModeSetting.h"
+#include "OptionalsReg.h"
 #include "ServiceBroker.h"
+#include "messaging/ApplicationMessenger.h"
 #include "settings/DisplaySettings.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
 #include "settings/lib/Setting.h"
-#include <string.h>
-
-#include "OptionalsReg.h"
-#include "platform/linux/OptionalsReg.h"
-#include "windowing/GraphicContext.h"
-#include "platform/linux/powermanagement/LinuxPowerSyscall.h"
-#include "settings/DisplaySettings.h"
-#include "utils/log.h"
 #include "utils/StringUtils.h"
-#include "DRMAtomic.h"
-#include "DRMLegacy.h"
-#include "OffScreenModeSetting.h"
-#include "messaging/ApplicationMessenger.h"
+#include "utils/log.h"
+#include "windowing/GraphicContext.h"
+
+#include "platform/linux/OptionalsReg.h"
+#include "platform/linux/powermanagement/LinuxPowerSyscall.h"
+
+#include <string.h>
 
 using namespace KODI::WINDOWING::GBM;
 
@@ -66,6 +68,7 @@ CWinSystemGbm::CWinSystemGbm() :
     }
   }
 
+  m_dpms = std::make_shared<CGBMDPMSSupport>();
   CLinuxPowerSyscall::Register();
   m_lirc.reset(OPTIONALS::LircRegister());
   m_libinput->Start();
@@ -207,11 +210,19 @@ void CWinSystemGbm::FlipPage(bool rendered, bool videoLayer)
     m_videoLayerBridge->Disable();
   }
 
-  struct gbm_bo *bo = m_GBM->LockFrontBuffer();
+  struct gbm_bo *bo = nullptr;
+
+  if (rendered)
+  {
+    bo = m_GBM->LockFrontBuffer();
+  }
 
   m_DRM->FlipPage(bo, rendered, videoLayer);
 
-  m_GBM->ReleaseBuffer();
+  if (rendered)
+  {
+    m_GBM->ReleaseBuffer();
+  }
 
   if (m_videoLayerBridge && !videoLayer)
   {

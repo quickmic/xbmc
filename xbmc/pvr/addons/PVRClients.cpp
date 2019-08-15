@@ -8,17 +8,20 @@
 
 #include "PVRClients.h"
 
-#include <utility>
-
 #include "ServiceBroker.h"
 #include "addons/BinaryAddonCache.h"
 #include "guilib/LocalizeStrings.h"
 #include "messaging/ApplicationMessenger.h"
-#include "utils/log.h"
-
 #include "pvr/PVRJobs.h"
 #include "pvr/PVRManager.h"
 #include "pvr/channels/PVRChannelGroupInternal.h"
+#include "utils/log.h"
+
+#include <functional>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
 using namespace ADDON;
 using namespace PVR;
@@ -233,7 +236,8 @@ void CPVRClients::OnAddonEvent(const AddonEvent& event)
       typeid(event) == typeid(AddonEvents::ReInstalled))
   {
     // update addons
-    CJobManager::GetInstance().AddJob(new CPVRUpdateAddonsJob(event.id), nullptr);
+    if (CServiceBroker::GetAddonMgr().HasType(event.id, ADDON_PVRDLL))
+      CJobManager::GetInstance().AddJob(new CPVRUpdateAddonsJob(event.id), nullptr);
   }
 }
 
@@ -453,17 +457,6 @@ std::vector<SBackend> CPVRClients::GetBackendProperties() const
   });
 
   return backendProperties;
-}
-
-bool CPVRClients::SupportsTimers() const
-{
-  bool bReturn = false;
-  ForCreatedClients(__FUNCTION__, [&bReturn](const CPVRClientPtr &client) {
-    if (!bReturn)
-      bReturn = client->GetClientCapabilities().SupportsTimers();
-    return PVR_ERROR_NO_ERROR;
-  });
-  return bReturn;
 }
 
 bool CPVRClients::GetTimers(CPVRTimersContainer *timers, std::vector<int> &failedClients)

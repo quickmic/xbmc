@@ -8,15 +8,15 @@
 
 #include "SettingsManager.h"
 
-#include <algorithm>
-#include <utility>
-
+#include "Setting.h"
 #include "SettingDefinitions.h"
 #include "SettingSection.h"
-#include "Setting.h"
-#include "utils/log.h"
 #include "utils/StringUtils.h"
 #include "utils/XBMCTinyXML.h"
+#include "utils/log.h"
+
+#include <algorithm>
+#include <utility>
 
 const uint32_t CSettingsManager::Version = 2;
 const uint32_t CSettingsManager::MinimumSupportedVersion = 0;
@@ -423,14 +423,19 @@ void CSettingsManager::RegisterSettingControl(const std::string &controlType, IS
     m_settingControlCreators.insert(std::make_pair(controlType, settingControlCreator));
 }
 
-void CSettingsManager::RegisterSettingsHandler(ISettingsHandler *settingsHandler)
+void CSettingsManager::RegisterSettingsHandler(ISettingsHandler *settingsHandler, bool bFront /* = false */)
 {
   if (settingsHandler == nullptr)
     return;
 
   CExclusiveLock lock(m_critical);
   if (find(m_settingsHandlers.begin(), m_settingsHandlers.end(), settingsHandler) == m_settingsHandlers.end())
-    m_settingsHandlers.push_back(settingsHandler);
+  {
+    if (bFront)
+      m_settingsHandlers.insert(m_settingsHandlers.begin(), settingsHandler);
+    else
+      m_settingsHandlers.emplace_back(settingsHandler);
+  }
 }
 
 void CSettingsManager::UnregisterSettingsHandler(ISettingsHandler *settingsHandler)

@@ -8,33 +8,38 @@
 
 #include "PVRGUIInfo.h"
 
-#include <cmath>
-#include <ctime>
-
 #include "Application.h"
 #include "GUIInfoManager.h"
 #include "ServiceBroker.h"
 #include "guilib/GUIComponent.h"
+#include "guilib/GUIWindowManager.h"
 #include "guilib/LocalizeStrings.h"
 #include "guilib/guiinfo/GUIInfo.h"
-#include "guilib/guiinfo/GUIInfoHelper.h"
 #include "guilib/guiinfo/GUIInfoLabels.h"
+#include "pvr/PVRGUIActions.h"
+#include "pvr/PVRItem.h"
+#include "pvr/PVRManager.h"
+#include "pvr/addons/PVRClients.h"
+#include "pvr/channels/PVRChannel.h"
+#include "pvr/channels/PVRChannelGroup.h"
+#include "pvr/channels/PVRChannelGroupsContainer.h"
+#include "pvr/channels/PVRRadioRDSInfoTag.h"
+#include "pvr/epg/EpgInfoTag.h"
+#include "pvr/recordings/PVRRecording.h"
+#include "pvr/recordings/PVRRecordings.h"
+#include "pvr/timers/PVRTimerInfoTag.h"
+#include "pvr/timers/PVRTimers.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
 #include "threads/SingleLock.h"
 #include "utils/StringUtils.h"
 
-#include "pvr/PVRGUIActions.h"
-#include "pvr/PVRItem.h"
-#include "pvr/PVRManager.h"
-#include "pvr/addons/PVRClients.h"
-#include "pvr/channels/PVRChannel.h"
-#include "pvr/channels/PVRChannelGroupsContainer.h"
-#include "pvr/channels/PVRRadioRDSInfoTag.h"
-#include "pvr/epg/EpgInfoTag.h"
-#include "pvr/recordings/PVRRecordings.h"
-#include "pvr/timers/PVRTimers.h"
+#include <cmath>
+#include <ctime>
+#include <memory>
+#include <string>
+#include <vector>
 
 using namespace PVR;
 using namespace KODI::GUILIB::GUIINFO;
@@ -77,6 +82,7 @@ void CPVRGUIInfo::ResetProperties(void)
   m_bIsPlayingEncryptedStream   = false;
   m_bIsRecordingPlayingChannel  = false;
   m_bCanRecordPlayingChannel    = false;
+  m_bIsPlayingActiveRecording   = false;
   m_bHasTVChannels              = false;
   m_bHasRadioChannels           = false;
 
@@ -238,6 +244,7 @@ void CPVRGUIInfo::UpdateMisc(void)
   bool       bHasRadioChannels         = bStarted && CServiceBroker::GetPVRManager().ChannelGroups()->GetGroupAllRadio()->HasChannels();
   bool bCanRecordPlayingChannel        = bStarted && CServiceBroker::GetPVRManager().CanRecordOnPlayingChannel();
   bool bIsRecordingPlayingChannel      = bStarted && CServiceBroker::GetPVRManager().IsRecordingOnPlayingChannel();
+  bool bIsPlayingActiveRecording       = bStarted && CServiceBroker::GetPVRManager().IsPlayingActiveRecording();
   std::string strPlayingTVGroup        = (bStarted && bIsPlayingTV) ? CServiceBroker::GetPVRManager().GetPlayingGroup(false)->GroupName() : "";
   std::string strPlayingRadioGroup     = (bStarted && bIsPlayingRadio) ? CServiceBroker::GetPVRManager().GetPlayingGroup(true)->GroupName() : "";
 
@@ -256,6 +263,7 @@ void CPVRGUIInfo::UpdateMisc(void)
   m_strPlayingRadioGroup      = strPlayingRadioGroup;
   m_bCanRecordPlayingChannel  = bCanRecordPlayingChannel;
   m_bIsRecordingPlayingChannel = bIsRecordingPlayingChannel;
+  m_bIsPlayingActiveRecording = bIsPlayingActiveRecording;
 }
 
 void CPVRGUIInfo::UpdateTimeshiftData(void)
@@ -275,6 +283,25 @@ bool CPVRGUIInfo::GetLabel(std::string& value, const CFileItem *item, int contex
          GetRadioRDSLabel(item, info, value);
 }
 
+namespace
+{
+  std::string GetAsLocalizedDateString(const CDateTime& datetime, bool bLongDate)
+  {
+    return datetime.IsValid() ? datetime.GetAsLocalizedDate(bLongDate) : "";
+  }
+
+  std::string GetAsLocalizedTimeString(const CDateTime& datetime)
+  {
+    return datetime.IsValid() ? datetime.GetAsLocalizedTime("", false) : "";
+  }
+
+  std::string GetAsLocalizedDateTimeString(const CDateTime& datetime)
+  {
+    return datetime.IsValid() ? datetime.GetAsLocalizedDateTime(false, false) : "";
+  }
+
+} // unnamed namespace
+
 bool CPVRGUIInfo::GetListItemAndPlayerLabel(const CFileItem *item, const CGUIInfo &info, std::string &strValue) const
 {
   const CPVRTimerInfoTagPtr timer = item->GetPVRTimerInfoTag();
@@ -286,22 +313,29 @@ bool CPVRGUIInfo::GetListItemAndPlayerLabel(const CFileItem *item, const CGUIInf
         strValue = timer->Summary();
         return true;
       case LISTITEM_STARTDATE:
-        strValue = timer->StartAsLocalTime().GetAsLocalizedDate(true);
+        strValue = GetAsLocalizedDateString(timer->StartAsLocalTime(), true);
         return true;
       case LISTITEM_STARTTIME:
-        strValue = timer->StartAsLocalTime().GetAsLocalizedTime("", false);
+        strValue = GetAsLocalizedTimeString(timer->StartAsLocalTime());
         return true;
       case LISTITEM_ENDDATE:
-        strValue = timer->EndAsLocalTime().GetAsLocalizedDate(true);
+        strValue = GetAsLocalizedDateString(timer->EndAsLocalTime(), true);
         return true;
       case LISTITEM_ENDTIME:
-        strValue = timer->EndAsLocalTime().GetAsLocalizedTime("", false);
+        strValue = GetAsLocalizedTimeString(timer->EndAsLocalTime());
         return true;
+      case LISTITEM_DURATION:
+        if (timer->GetDuration() > 0)
+        {
+          strValue = StringUtils::SecondsToTimeString(timer->GetDuration(), static_cast<TIME_FORMAT>(info.GetData4()));
+          return true;
+        }
+        return false;
       case LISTITEM_TITLE:
         strValue = timer->Title();
         return true;
       case LISTITEM_COMMENT:
-        strValue = timer->GetStatus();
+        strValue = timer->GetStatus(CServiceBroker::GetGUI()->GetWindowManager().GetActiveWindow() == WINDOW_RADIO_TIMER_RULES);
         return true;
       case LISTITEM_TIMERTYPE:
         strValue = timer->GetTypeAsString();
@@ -314,7 +348,6 @@ bool CPVRGUIInfo::GetListItemAndPlayerLabel(const CFileItem *item, const CGUIInf
       case LISTITEM_GENRE:
       case LISTITEM_PLOT:
       case LISTITEM_PLOT_OUTLINE:
-      case LISTITEM_DURATION:
       case LISTITEM_ORIGINALTITLE:
       case LISTITEM_YEAR:
       case LISTITEM_SEASON:
@@ -337,33 +370,33 @@ bool CPVRGUIInfo::GetListItemAndPlayerLabel(const CFileItem *item, const CGUIInf
     switch (info.m_info)
     {
       case LISTITEM_DATE:
-        strValue = recording->RecordingTimeAsLocalTime().GetAsLocalizedDateTime(false, false);
+        strValue = GetAsLocalizedDateTimeString(recording->RecordingTimeAsLocalTime());
         return true;
       case LISTITEM_STARTDATE:
-        strValue = recording->RecordingTimeAsLocalTime().GetAsLocalizedDate(true);
+        strValue = GetAsLocalizedDateString(recording->RecordingTimeAsLocalTime(), true);
         return true;
       case VIDEOPLAYER_STARTTIME:
       case LISTITEM_STARTTIME:
-        strValue = recording->RecordingTimeAsLocalTime().GetAsLocalizedTime("", false);
+        strValue = GetAsLocalizedTimeString(recording->RecordingTimeAsLocalTime());
         return true;
       case LISTITEM_ENDDATE:
-        strValue = recording->EndTimeAsLocalTime().GetAsLocalizedDate(true);
+        strValue = GetAsLocalizedDateString(recording->EndTimeAsLocalTime(), true);
         return true;
       case VIDEOPLAYER_ENDTIME:
       case LISTITEM_ENDTIME:
-        strValue = recording->EndTimeAsLocalTime().GetAsLocalizedTime("", false);
+        strValue = GetAsLocalizedTimeString(recording->EndTimeAsLocalTime());
         return true;
       case LISTITEM_EXPIRATION_DATE:
         if (recording->HasExpirationTime())
         {
-          strValue = recording->ExpirationTimeAsLocalTime().GetAsLocalizedDate(false);
+          strValue = GetAsLocalizedDateString(recording->ExpirationTimeAsLocalTime(), false);
           return true;
         }
         break;
       case LISTITEM_EXPIRATION_TIME:
         if (recording->HasExpirationTime())
         {
-          strValue = recording->ExpirationTimeAsLocalTime().GetAsLocalizedTime("", false);;
+          strValue = GetAsLocalizedTimeString(recording->ExpirationTimeAsLocalTime());;
           return true;
         }
         break;
@@ -442,7 +475,10 @@ bool CPVRGUIInfo::GetListItemAndPlayerLabel(const CFileItem *item, const CGUIInf
         // Note: in difference to LISTITEM_TITLE, LISTITEM_EPG_EVENT_TITLE returns the title
         // associated with the epg event of a timer, if any, and not the title of the timer.
         if (epgTag)
-          strValue = epgTag->Title();
+        {
+          bool bLocked = CServiceBroker::GetPVRManager().IsParentalLocked(epgTag);
+          strValue = bLocked ? g_localizeStrings.Get(19266) /* Parental locked */ : epgTag->Title();
+        }
         if (strValue.empty() && !CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(CSettings::SETTING_EPG_HIDENOINFOAVAILABLE))
           strValue = g_localizeStrings.Get(19055); // no information available
         return true;
@@ -463,36 +499,38 @@ bool CPVRGUIInfo::GetListItemAndPlayerLabel(const CFileItem *item, const CGUIInf
       case LISTITEM_PLOT:
       case VIDEOPLAYER_NEXT_PLOT:
       case LISTITEM_NEXT_PLOT:
-        strValue = epgTag->Plot();
+        if (!CServiceBroker::GetPVRManager().IsParentalLocked(epgTag))
+          strValue = epgTag->Plot();
         return true;
       case VIDEOPLAYER_PLOT_OUTLINE:
       case LISTITEM_PLOT_OUTLINE:
       case VIDEOPLAYER_NEXT_PLOT_OUTLINE:
       case LISTITEM_NEXT_PLOT_OUTLINE:
-        strValue = epgTag->PlotOutline();
+        if (!CServiceBroker::GetPVRManager().IsParentalLocked(epgTag))
+          strValue = epgTag->PlotOutline();
         return true;
       case LISTITEM_DATE:
-        strValue = epgTag->StartAsLocalTime().GetAsLocalizedDateTime(false, false);
+        strValue = GetAsLocalizedDateTimeString(epgTag->StartAsLocalTime());
         return true;
       case LISTITEM_STARTDATE:
       case LISTITEM_NEXT_STARTDATE:
-        strValue = epgTag->StartAsLocalTime().GetAsLocalizedDate(true);
+        strValue = GetAsLocalizedDateString(epgTag->StartAsLocalTime(), true);
         return true;
       case VIDEOPLAYER_STARTTIME:
       case VIDEOPLAYER_NEXT_STARTTIME:
       case LISTITEM_STARTTIME:
       case LISTITEM_NEXT_STARTTIME:
-        strValue = epgTag->StartAsLocalTime().GetAsLocalizedTime("", false);
+        strValue = GetAsLocalizedTimeString(epgTag->StartAsLocalTime());
         return true;
       case LISTITEM_ENDDATE:
       case LISTITEM_NEXT_ENDDATE:
-        strValue = epgTag->EndAsLocalTime().GetAsLocalizedDate(true);
+        strValue = GetAsLocalizedDateString(epgTag->EndAsLocalTime(), true);
         return true;
       case VIDEOPLAYER_ENDTIME:
       case VIDEOPLAYER_NEXT_ENDTIME:
       case LISTITEM_ENDTIME:
       case LISTITEM_NEXT_ENDTIME:
-        strValue = epgTag->EndAsLocalTime().GetAsLocalizedTime("", false);
+        strValue = GetAsLocalizedTimeString(epgTag->EndAsLocalTime());
         return true;
       // note: for some reason, there is no VIDEOPLAYER_DURATION
       case LISTITEM_DURATION:
@@ -510,7 +548,8 @@ bool CPVRGUIInfo::GetListItemAndPlayerLabel(const CFileItem *item, const CGUIInf
         return true;
       case VIDEOPLAYER_ORIGINALTITLE:
       case LISTITEM_ORIGINALTITLE:
-        strValue = epgTag->OriginalTitle();
+        if (!CServiceBroker::GetPVRManager().IsParentalLocked(epgTag))
+          strValue = epgTag->OriginalTitle();
         return true;
       case VIDEOPLAYER_YEAR:
       case LISTITEM_YEAR:
@@ -541,7 +580,8 @@ bool CPVRGUIInfo::GetListItemAndPlayerLabel(const CFileItem *item, const CGUIInf
         return false;
       case VIDEOPLAYER_EPISODENAME:
       case LISTITEM_EPISODENAME:
-        strValue = epgTag->EpisodeName();
+        if (!CServiceBroker::GetPVRManager().IsParentalLocked(epgTag))
+          strValue = epgTag->EpisodeName();
         return true;
       case VIDEOPLAYER_CAST:
       case LISTITEM_CAST:
@@ -559,13 +599,14 @@ bool CPVRGUIInfo::GetListItemAndPlayerLabel(const CFileItem *item, const CGUIInf
         strValue = epgTag->Icon();
         return true;
       case VIDEOPLAYER_PARENTAL_RATING:
-      case LISTITEM_PARENTALRATING:
+      case LISTITEM_PARENTAL_RATING:
         if (epgTag->ParentalRating() > 0)
         {
           strValue = StringUtils::Format("%i", epgTag->ParentalRating());
           return true;
         }
         return false;
+      case VIDEOPLAYER_PREMIERED:
       case LISTITEM_PREMIERED:
         if (epgTag->FirstAiredAsLocalTime().IsValid())
         {
@@ -573,6 +614,17 @@ bool CPVRGUIInfo::GetListItemAndPlayerLabel(const CFileItem *item, const CGUIInf
           return true;
         }
         return false;
+      case VIDEOPLAYER_RATING:
+      case LISTITEM_RATING:
+      {
+        int iStarRating = epgTag->StarRating();
+        if (iStarRating > 0)
+        {
+          strValue = StringUtils::FormatNumber(iStarRating);
+          return true;
+        }
+        return false;
+      }
     }
   }
 
@@ -1062,10 +1114,24 @@ bool CPVRGUIInfo::GetListItemAndPlayerBool(const CFileItem *item, const CGUIInfo
 {
   switch (info.m_info)
   {
+    case LISTITEM_HASARCHIVE:
+      if (item->IsPVRChannel())
+      {
+        bValue = item->GetPVRChannelInfoTag()->HasArchive();
+        return true;
+      }
+      break;
+    case LISTITEM_ISPLAYABLE:
+      if (item->IsEPG())
+      {
+        bValue = item->GetEPGInfoTag()->IsPlayable();
+        return true;
+      }
+      break;
     case LISTITEM_ISRECORDING:
       if (item->IsPVRChannel())
       {
-        bValue = item->GetPVRChannelInfoTag()->IsRecording();
+        bValue = CServiceBroker::GetPVRManager().Timers()->IsRecordingOnChannel(*item->GetPVRChannelInfoTag());
         return true;
       }
       else if (item->IsEPG() || item->IsPVRTimer())
@@ -1095,7 +1161,7 @@ bool CPVRGUIInfo::GetListItemAndPlayerBool(const CFileItem *item, const CGUIInfo
       {
         const CPVREpgInfoTagPtr epgTag = CPVRItem(item).GetEpgInfoTag();
         if (epgTag)
-          bValue = epgTag->HasTimer();
+          bValue = !!CServiceBroker::GetPVRManager().Timers()->GetTimerForEpgTag(epgTag);
         return true;
       }
       break;
@@ -1105,6 +1171,24 @@ bool CPVRGUIInfo::GetListItemAndPlayerBool(const CFileItem *item, const CGUIInfo
         const CPVRTimerInfoTagPtr timer = CPVRItem(item).GetTimerInfoTag();
         if (timer)
           bValue = timer->GetTimerRuleId() != PVR_TIMER_NO_PARENT;
+        return true;
+      }
+      break;
+    case LISTITEM_HASREMINDER:
+      if (item->IsPVRChannel() || item->IsEPG() || item->IsPVRTimer())
+      {
+        const std::shared_ptr<CPVRTimerInfoTag> timer = CPVRItem(item).GetTimerInfoTag();
+        if (timer)
+          bValue = timer->IsReminder();
+        return true;
+      }
+      break;
+    case LISTITEM_HASREMINDERRULE:
+      if (item->IsPVRChannel() || item->IsEPG() || item->IsPVRTimer())
+      {
+        const std::shared_ptr<CPVRTimerInfoTag> timer = CPVRItem(item).GetTimerInfoTag();
+        if (timer)
+          bValue = timer->IsReminder() && (timer->GetTimerRuleId() != PVR_TIMER_NO_PARENT);
         return true;
       }
       break;
@@ -1140,7 +1224,7 @@ bool CPVRGUIInfo::GetListItemAndPlayerBool(const CFileItem *item, const CGUIInfo
       {
         const CPVREpgInfoTagPtr epgTag = CPVRItem(item).GetEpgInfoTag();
         if (epgTag)
-          bValue = epgTag->HasRecording();
+          bValue = !!CServiceBroker::GetPVRManager().Recordings()->GetRecordingForEpgTag(epgTag);
         return true;
       }
       break;
@@ -1187,8 +1271,9 @@ bool CPVRGUIInfo::GetListItemAndPlayerBool(const CFileItem *item, const CGUIInfo
       if (item->IsPVRRecording())
       {
         const CPVRRecordingPtr recording = item->GetPVRRecordingInfoTag();
-        const CPVREpgInfoTagPtr epgTag = CServiceBroker::GetPVRManager().EpgContainer().GetTagById(recording->Channel(), recording->BroadcastUid());
-        bValue = (epgTag && epgTag->IsActive() && epgTag->Channel());
+        const std::shared_ptr<CPVREpg> epg = recording->Channel() ? recording->Channel()->GetEPG() : nullptr;
+        const std::shared_ptr<CPVREpgInfoTag> epgTag = CServiceBroker::GetPVRManager().EpgContainer().GetTagById(epg, recording->BroadcastUid());
+        bValue = (epgTag && epgTag->IsActive());
         return true;
       }
       break;
@@ -1274,6 +1359,9 @@ bool CPVRGUIInfo::GetPVRBool(const CFileItem *item, const CGUIInfo &info, bool& 
       return true;
     case PVR_IS_RECORDING_PLAYING_CHANNEL:
       bValue = m_bIsRecordingPlayingChannel;
+      return true;
+    case PVR_IS_PLAYING_ACTIVE_RECORDING:
+      bValue = m_bIsPlayingActiveRecording;
       return true;
   }
   return false;

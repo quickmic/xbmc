@@ -7,13 +7,14 @@
  */
 
 #include "PeripheralBus.h"
+
+#include "FileItem.h"
 #include "guilib/LocalizeStrings.h"
 #include "peripherals/Peripherals.h"
 #include "peripherals/devices/Peripheral.h"
 #include "utils/StringUtils.h"
 #include "utils/Variant.h"
 #include "utils/log.h"
-#include "FileItem.h"
 
 using namespace PERIPHERALS;
 
@@ -302,7 +303,7 @@ void CPeripheralBus::GetDirectory(const std::string &strPath, CFileItemList &ite
 
     peripheralFile->SetProperty("version", strVersion);
     peripheralFile->SetLabel2(strDetails);
-    peripheralFile->SetIconImage("DefaultAddon.png");
+    peripheralFile->SetArt("icon", "DefaultAddon.png");
     items.Add(peripheralFile);
   }
 }

@@ -6,23 +6,25 @@
  *  See LICENSES/README.md for more information.
  */
 
+#include "VideoPlayerVideo.h"
+
+#include "DVDCodecs/DVDCodecUtils.h"
+#include "DVDCodecs/DVDFactoryCodec.h"
+#include "DVDCodecs/Video/DVDVideoCodecFFmpeg.h"
 #include "ServiceBroker.h"
-#include "windowing/WinSystem.h"
+#include "cores/VideoPlayer/Interface/Addon/DemuxPacket.h"
+#include "cores/VideoPlayer/Interface/Addon/TimingConstants.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/SettingsComponent.h"
 #include "utils/MathUtils.h"
-#include "VideoPlayerVideo.h"
-#include "DVDCodecs/DVDFactoryCodec.h"
-#include "DVDCodecs/DVDCodecUtils.h"
-#include "DVDCodecs/Video/DVDVideoCodecFFmpeg.h"
-#include "cores/VideoPlayer/Interface/Addon/DemuxPacket.h"
-#include "cores/VideoPlayer/Interface/Addon/TimingConstants.h"
-#include "windowing/GraphicContext.h"
-#include <sstream>
-#include <iomanip>
-#include <numeric>
-#include <iterator>
 #include "utils/log.h"
+#include "windowing/GraphicContext.h"
+#include "windowing/WinSystem.h"
+
+#include <iomanip>
+#include <iterator>
+#include <numeric>
+#include <sstream>
 
 class CDVDMsgVideoCodecChange : public CDVDMsg
 {
@@ -462,6 +464,7 @@ void CVideoPlayerVideo::Process()
       }
 
       m_renderManager.DiscardBuffer();
+      FlushMessages();
     }
     else if (pMsg->IsType(CDVDMsg::PLAYER_SETSPEED))
     {
@@ -776,7 +779,6 @@ void CVideoPlayerVideo::Flush(bool sync)
   /* flush using message as this get's called from VideoPlayer thread */
   /* and any demux packet that has been taken out of queue need to */
   /* be disposed of before we flush */
-  FlushMessages();
   SendMessage(new CDVDMsgBool(CDVDMsg::GENERAL_FLUSH, sync), 1);
   m_bAbortOutput = true;
 }

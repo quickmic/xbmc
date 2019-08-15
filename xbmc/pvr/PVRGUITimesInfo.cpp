@@ -8,17 +8,21 @@
 
 #include "PVRGUITimesInfo.h"
 
-#include <cmath>
-
 #include "ServiceBroker.h"
 #include "cores/DataCacheCore.h"
+#include "pvr/PVRManager.h"
+#include "pvr/channels/PVRChannel.h"
+#include "pvr/channels/PVRChannelGroupsContainer.h"
+#include "pvr/epg/EpgInfoTag.h"
+#include "pvr/recordings/PVRRecording.h"
 #include "settings/AdvancedSettings.h"
-#include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
 #include "threads/SingleLock.h"
 #include "utils/StringUtils.h"
 
-#include "pvr/PVRManager.h"
+#include <cmath>
+#include <ctime>
+#include <memory>
 
 using namespace PVR;
 
@@ -56,9 +60,11 @@ void CPVRGUITimesInfo::UpdatePlayingTag()
     if (currentChannel && !currentTag)
       currentTag = currentChannel->GetEPGNow();
 
+    const std::shared_ptr<CPVRChannelGroupsContainer> groups = CServiceBroker::GetPVRManager().ChannelGroups();
+
     CSingleLock lock(m_critSection);
 
-    const CPVRChannelPtr playingChannel = m_playingEpgTag ? m_playingEpgTag->Channel() : nullptr;
+    const std::shared_ptr<CPVRChannel> playingChannel = m_playingEpgTag ? groups->GetChannelForEpgTag(m_playingEpgTag) : nullptr;
     if (!m_playingEpgTag || !m_playingEpgTag->IsActive() ||
         !playingChannel || !currentChannel || *playingChannel != *currentChannel)
     {

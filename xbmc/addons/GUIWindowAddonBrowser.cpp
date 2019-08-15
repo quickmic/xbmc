@@ -7,33 +7,34 @@
  */
 
 #include "GUIWindowAddonBrowser.h"
-#include "addons/AddonManager.h"
+
 #include "AddonSystemSettings.h"
-#include "addons/RepositoryUpdater.h"
+#include "ContextMenuManager.h"
+#include "FileItem.h"
 #include "GUIDialogAddonInfo.h"
-#include "dialogs/GUIDialogBusy.h"
-#include "dialogs/GUIDialogYesNo.h"
-#include "dialogs/GUIDialogSelect.h"
-#include "dialogs/GUIDialogFileBrowser.h"
 #include "GUIUserMessages.h"
+#include "LangInfo.h"
+#include "ServiceBroker.h"
+#include "URL.h"
+#include "addons/AddonInstaller.h"
+#include "addons/AddonManager.h"
+#include "addons/RepositoryUpdater.h"
+#include "dialogs/GUIDialogBusy.h"
+#include "dialogs/GUIDialogFileBrowser.h"
+#include "dialogs/GUIDialogSelect.h"
+#include "dialogs/GUIDialogYesNo.h"
+#include "filesystem/AddonsDirectory.h"
 #include "guilib/GUIComponent.h"
 #include "guilib/GUIWindowManager.h"
-#include "URL.h"
-#include "FileItem.h"
-#include "ServiceBroker.h"
-#include "filesystem/AddonsDirectory.h"
-#include "addons/AddonInstaller.h"
+#include "input/Key.h"
 #include "messaging/helpers/DialogHelper.h"
+#include "settings/MediaSourceSettings.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
-#include "settings/MediaSourceSettings.h"
+#include "storage/MediaManager.h"
 #include "threads/IRunnable.h"
 #include "utils/StringUtils.h"
 #include "utils/Variant.h"
-#include "storage/MediaManager.h"
-#include "LangInfo.h"
-#include "input/Key.h"
-#include "ContextMenuManager.h"
 
 #include <utility>
 
@@ -491,7 +492,7 @@ int CGUIWindowAddonBrowser::SelectAddonID(const std::vector<ADDON::TYPE> &types,
     CFileItemPtr item(new CFileItem("", false));
     item->SetLabel(g_localizeStrings.Get(231));
     item->SetLabel2(g_localizeStrings.Get(24040));
-    item->SetIconImage("DefaultAddonNone.png");
+    item->SetArt("icon", "DefaultAddonNone.png");
     item->SetSpecialSort(SortSpecialOnTop);
     items.Add(item);
   }

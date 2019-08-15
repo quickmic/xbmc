@@ -6,13 +6,14 @@
  */
 
 #include "VFSEntry.h"
+
+#include "ServiceBroker.h"
 #include "URL.h"
 #include "addons/binary-addons/BinaryAddonBase.h"
 #include "addons/binary-addons/BinaryAddonManager.h"
-#include "ServiceBroker.h"
 #include "network/ZeroconfBrowser.h"
-#include "utils/log.h"
 #include "utils/StringUtils.h"
+#include "utils/log.h"
 
 namespace ADDON
 {
@@ -344,7 +345,7 @@ static void VFSDirEntriesToCFileItemList(int num_entries,
     item->SetLabel(entries[i].label);
     item->SetPath(entries[i].path);
     item->m_dwSize = entries[i].size;
-    //item->m_dateTime = entries[i].mtime;
+    item->m_dateTime = entries[i].date_time;
     item->m_bIsFolder = entries[i].folder;
     if (entries[i].title)
       item->m_strTitle = entries[i].title;

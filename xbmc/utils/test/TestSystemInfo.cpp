@@ -9,9 +9,11 @@
 #include "utils/SystemInfo.h"
 #include "settings/Settings.h"
 #include "GUIInfoManager.h"
+#if defined(TARGET_WINDOWS)
 #include "platform/win32/CharsetConverter.h"
+#endif
 
-#include "gtest/gtest.h"
+#include <gtest/gtest.h>
 
 class TestSystemInfo : public testing::Test
 {
@@ -235,13 +237,6 @@ TEST_F(TestSystemInfo, GetUserAgent)
   EXPECT_NE(std::string::npos, g_sysinfo.GetUserAgent().find(" App_Bitness/")) << "'GetUserAgent()' must contain ' App_Bitness/'";
   EXPECT_NE(std::string::npos, g_sysinfo.GetUserAgent().find(" Version/")) << "'GetUserAgent()' must contain ' Version/'";
 }
-
-#ifndef TARGET_DARWIN
-TEST_F(TestSystemInfo, HasVideoToolBoxDecoder)
-{
-  EXPECT_FALSE(g_sysinfo.HasVideoToolBoxDecoder()) << "'HasVideoToolBoxDecoder()' must return 'false'";
-}
-#endif
 
 TEST_F(TestSystemInfo, GetBuildTargetPlatformName)
 {
