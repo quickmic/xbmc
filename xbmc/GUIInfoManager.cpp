@@ -5620,6 +5620,12 @@ const infomap container_str[]  = {{ "property",         CONTAINER_PROPERTY },
 ///     @skinning_v18 **[New Infolabel]** \link ListItem_Property_Game_VideoRotation `ListItem.Property(Game.VideoRotation)`\endlink
 ///     <p>  
 ///   }
+///   \table_row3{   <b>`ListItem.ParentalRating`</b>,
+///                  \anchor ListItem_ParentalRating
+///                  _string_,
+///     @return The parental rating of the list item (PVR).
+///     <p>
+///   }
 /// \table_end
 ///
 /// -----------------------------------------------------------------------------
@@ -5805,6 +5811,7 @@ const infomap listitem_labels[]= {{ "thumb",            LISTITEM_THUMB },
                                   { "expirationtime",   LISTITEM_EXPIRATION_TIME },
                                   { "art",              LISTITEM_ART },
                                   { "property",         LISTITEM_PROPERTY },
+                                  { "parentalrating",   LISTITEM_PARENTAL_RATING }
 };
 
 /// \page modules__infolabels_boolean_conditions
@@ -9020,13 +9027,13 @@ int CGUIInfoManager::TranslateSingleString(const std::string &strCondition, bool
       {
         int position = atoi(info[1].param().c_str());
         int value = TranslateMusicPlayerString(info[2].name); // musicplayer.position(foo).bar
-        return AddMultiInfo(CGUIInfo(value, 0, position));
+        return AddMultiInfo(CGUIInfo(value, 2, position)); // 2 => absolute (0 used for not set)
       }
       else if (info[1].name == "offset")
       {
         int position = atoi(info[1].param().c_str());
         int value = TranslateMusicPlayerString(info[2].name); // musicplayer.offset(foo).bar
-        return AddMultiInfo(CGUIInfo(value, 1, position));
+        return AddMultiInfo(CGUIInfo(value, 1, position)); // 1 => relative
       }
     }
     else if (info[0].name == "container")

@@ -1460,11 +1460,14 @@ void CVideoPlayer::Process()
       continue;
     }
 
-    if (m_demuxerSpeed == DVD_PLAYSPEED_PAUSE)
+    // adjust demuxer speed; some rtsp servers wants to know for i.e. ff
+    // delay pause until queue is full
+    if (m_playSpeed != DVD_PLAYSPEED_PAUSE &&
+        m_demuxerSpeed != m_playSpeed)
     {
       if (m_pDemuxer)
-        m_pDemuxer->SetSpeed(DVD_PLAYSPEED_NORMAL);
-      m_demuxerSpeed = DVD_PLAYSPEED_NORMAL;
+        m_pDemuxer->SetSpeed(m_playSpeed);
+      m_demuxerSpeed = m_playSpeed;
     }
 
     // always yield to players if they have data levels > 50 percent
@@ -2006,7 +2009,8 @@ void CVideoPlayer::HandlePlaySpeed()
       m_VideoPlayerAudio->SendMessage(new CDVDMsgDouble(CDVDMsg::GENERAL_RESYNC, m_clock.GetClock()), 1);
     }
     else if (m_CurrentVideo.syncState == IDVDStreamPlayer::SYNC_WAITSYNC &&
-             m_CurrentVideo.avsync == CCurrentStream::AV_SYNC_CONT)
+             (m_CurrentVideo.avsync == CCurrentStream::AV_SYNC_CONT ||
+             m_CurrentAudio.syncState == IDVDStreamPlayer::SYNC_INSYNC))
     {
       m_CurrentVideo.syncState = IDVDStreamPlayer::SYNC_INSYNC;
       m_CurrentVideo.avsync = CCurrentStream::AV_SYNC_NONE;
@@ -2333,6 +2337,8 @@ bool CVideoPlayer::CheckContinuity(CCurrentStream& current, DemuxPacket* pPacket
       UpdateCorrection(pPacket, correction);
       lastdts = pPacket->dts;
       CLog::Log(LOGDEBUG, "CVideoPlayer::CheckContinuity - update correction: %f", correction);
+      if (current.avsync == CCurrentStream::AV_SYNC_CHECK)
+        current.avsync = CCurrentStream::AV_SYNC_CONT;
     }
     else
     {
@@ -3767,12 +3773,10 @@ bool CVideoPlayer::OpenVideoStream(CDVDStreamInfo& hint, bool reset)
 
     // look for any EDL files
     m_Edl.Clear();
-    if (hint.fpsrate > 0 && hint.fpsscale > 0)
-    {
-      float fFramesPerSecond = (float)m_CurrentVideo.hint.fpsrate / (float)m_CurrentVideo.hint.fpsscale;
-      m_Edl.ReadEditDecisionLists(m_item, fFramesPerSecond, m_CurrentVideo.hint.height);
-    }
-
+    float fFramesPerSecond = 0.0f;
+    if (m_CurrentVideo.hint.fpsscale > 0.0f)
+      fFramesPerSecond = static_cast<float>(m_CurrentVideo.hint.fpsrate) / static_cast<float>(m_CurrentVideo.hint.fpsscale);
+    m_Edl.ReadEditDecisionLists(m_item, fFramesPerSecond);
     static_cast<IDVDStreamPlayerVideo*>(player)->SetSpeed(m_streamPlayerSpeed);
     m_CurrentVideo.syncState = IDVDStreamPlayer::SYNC_STARTING;
     m_CurrentVideo.packets = 0;

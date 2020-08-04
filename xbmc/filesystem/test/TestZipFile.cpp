@@ -9,12 +9,13 @@
 #include "ServiceBroker.h"
 #include "filesystem/Directory.h"
 #include "filesystem/File.h"
-#include "utils/StringUtils.h"
-#include "utils/URIUtils.h"
+#include "filesystem/ZipFile.h"
 #include "FileItem.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
 #include "test/TestUtils.h"
+#include "utils/StringUtils.h"
+#include "utils/URIUtils.h"
 #include "URL.h"
 
 #include <errno.h>
@@ -144,7 +145,7 @@ TEST_F(TestZipFile, CorruptedFile)
   memset(&buf, 0, sizeof(buf));
   std::string reffilepath, strpathinzip, str;
   CFileItemList itemlist;
-  unsigned int size, i;
+  ssize_t size, i;
   int64_t count = 0;
 
   reffilepath = XBMC_REF_FILE_PATH("xbmc/filesystem/test/reffile.txt.zip");
@@ -192,7 +193,7 @@ TEST_F(TestZipFile, CorruptedFile)
       str = StringUtils::Format("%02X ", buf[i]);
       std::cout << str;
     }
-    while (i++ < sizeof(buf))
+    while (i++ < static_cast<ssize_t> (sizeof(buf)))
       std::cout << "   ";
     std::cout << " [";
     for (i = 0; i < size; i++)
@@ -206,4 +207,23 @@ TEST_F(TestZipFile, CorruptedFile)
   }
   file->Close();
   XBMC_DELETETEMPFILE(file);
+}
+
+TEST_F(TestZipFile, ExtendedLocalHeader)
+{
+  XFILE::CFile file;
+  ssize_t readlen;
+  char zipdata[20000]; // size of zip file is 15352 Bytes
+
+  ASSERT_TRUE(file.Open(XBMC_REF_FILE_PATH("xbmc/filesystem/test/extendedlocalheader.zip")));
+  readlen = file.Read(zipdata, sizeof(zipdata));
+  EXPECT_TRUE(readlen);
+
+  XFILE::CZipFile zipfile;
+  std::string strBuffer;
+
+  int iSize = zipfile.UnpackFromMemory(strBuffer, std::string(zipdata, readlen), false);
+  EXPECT_EQ(152774, iSize); // sum of uncompressed size of all files in zip
+  EXPECT_TRUE(strBuffer.substr(0, 6) == "<Data>");
+  file.Close();
 }

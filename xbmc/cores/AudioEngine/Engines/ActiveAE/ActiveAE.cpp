@@ -208,7 +208,7 @@ float CEngineStats::GetCacheTotal()
   return MAX_CACHE_LEVEL;
 }
 
-float CEngineStats::GetMaxDelay()
+float CEngineStats::GetMaxDelay() const
 {
   return MAX_CACHE_LEVEL + MAX_WATER_LEVEL + m_sinkCacheTotal;
 }
@@ -595,6 +595,7 @@ void CActiveAE::StateMachine(int signal, Protocol *port, Message *msg)
           m_stats.SetSuspended(true);
           m_state = AE_TOP_CONFIGURED_SUSPEND;
           m_extDeferData = true;
+          m_extSuspended = true;
           return;
         case CActiveAEControlProtocol::DISPLAYLOST:
           if (m_sink.GetDeviceType(m_mode == MODE_PCM ? m_settings.device : m_settings.passthroughdevice) == AE_DEVTYPE_HDMI)
@@ -828,10 +829,13 @@ void CActiveAE::StateMachine(int signal, Protocol *port, Message *msg)
         switch (signal)
         {
         case CActiveAEControlProtocol::DISPLAYRESET:
+          if (m_extSuspended)
+            return;
           CLog::Log(LOGDEBUG,"CActiveAE - display reset event");
           displayReset = true;
         case CActiveAEControlProtocol::INIT:
           m_extError = false;
+          m_extSuspended = false;
           if (!displayReset)
           {
             m_controlPort.PurgeOut(CActiveAEControlProtocol::DEVICECHANGE);
@@ -2191,7 +2195,7 @@ bool CActiveAE::RunStages()
             {
               // copy the samples into the viz input buffer
               CSampleBuffer *viz = m_vizBuffersInput->GetFreeBuffer();
-              int samples = out->pkt->nb_samples;
+              int samples = std::min(out->pkt->nb_samples, viz->pkt->max_nb_samples);
               int bytes = samples * out->pkt->config.channels / out->pkt->planes * out->pkt->bytes_per_sample;
               for(int i= 0; i < out->pkt->planes; i++)
               {

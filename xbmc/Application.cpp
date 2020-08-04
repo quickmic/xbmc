@@ -171,6 +171,7 @@
 #include "XHandle.h"
 #include "XTimeUtils.h"
 #include "platform/posix/filesystem/PosixDirectory.h"
+#include "platform/posix/PlatformPosix.h"
 #endif
 
 #if defined(TARGET_ANDROID)
@@ -1315,6 +1316,7 @@ bool CApplication::LoadSkin(const std::string& skinID)
   CServiceBroker::GetGUI()->GetWindowManager().AddMsgTarget(this);
   CServiceBroker::GetGUI()->GetWindowManager().AddMsgTarget(&CServiceBroker::GetPlaylistPlayer());
   CServiceBroker::GetGUI()->GetWindowManager().AddMsgTarget(&g_fontManager);
+  CServiceBroker::GetGUI()->GetWindowManager().AddMsgTarget(&CServiceBroker::GetGUI()->GetStereoscopicsManager());
   CServiceBroker::GetGUI()->GetWindowManager().SetCallback(*this);
   //@todo should be done by GUIComponents
   CServiceBroker::GetGUI()->GetWindowManager().Initialize();
@@ -2523,7 +2525,7 @@ bool CApplication::Cleanup()
 
 void CApplication::Stop(int exitCode)
 {
-  CLog::Log(LOGNOTICE, "stop player");
+  CLog::Log(LOGNOTICE, "Stopping player");
   m_appPlayer.ClosePlayer();
 
   {
@@ -2580,7 +2582,7 @@ void CApplication::Stop(int exitCode)
     CApplicationMessenger::GetInstance().Stop();
     m_AppFocused = false;
     m_ExitCode = exitCode;
-    CLog::Log(LOGNOTICE, "stop all");
+    CLog::Log(LOGNOTICE, "Stopping all");
 
     // cancel any jobs from the jobmanager
     CJobManager::GetInstance().CancelJobs();
@@ -2599,7 +2601,7 @@ void CApplication::Stop(int exitCode)
 #ifdef HAS_ZEROCONF
     if(CZeroconfBrowser::IsInstantiated())
     {
-      CLog::Log(LOGNOTICE, "stop zeroconf browser");
+      CLog::Log(LOGNOTICE, "Stopping zeroconf browser");
       CZeroconfBrowser::GetInstance()->Stop();
       CZeroconfBrowser::ReleaseInstance();
     }
@@ -2635,7 +2637,7 @@ void CApplication::Stop(int exitCode)
     m_pActiveAE->Shutdown();
     m_pActiveAE.reset();
 
-    CLog::Log(LOGNOTICE, "stopped");
+    CLog::Log(LOGNOTICE, "Application stopped");
   }
   catch (...)
   {
@@ -2669,7 +2671,11 @@ bool CApplication::PlayMedia(CFileItem& item, const std::string &player, int iPl
       smartpl.OpenAndReadName(item.GetURL());
       CPlayList playlist;
       playlist.Add(items);
-      return ProcessAndStartPlaylist(smartpl.GetName(), playlist, (smartpl.GetType() == "songs" || smartpl.GetType() == "albums") ? PLAYLIST_MUSIC:PLAYLIST_VIDEO);
+      int iPlaylist = PLAYLIST_VIDEO;
+      if (smartpl.GetType() == "songs" || smartpl.GetType() == "albums" ||
+          smartpl.GetType() == "artists")
+        iPlaylist = PLAYLIST_MUSIC;
+      return ProcessAndStartPlaylist(smartpl.GetName(), playlist, iPlaylist);
     }
   }
   else if (item.IsPlayList() || item.IsInternetStream())
@@ -3083,6 +3089,10 @@ void CApplication::OnPlayerCloseFile(const CFileItem &file, const CBookmark &boo
   CBookmark resumeBookmark;
   bool playCountUpdate = false;
   float percent = 0.0f;
+
+  // Make sure we don't reset existing bookmark etc. on eg. player start failure
+  if (bookmark.timeInSeconds == 0.0f)
+    return;
 
   if (m_stackHelper.GetRegisteredStack(fileItem) != nullptr && m_stackHelper.GetRegisteredStackTotalTimeMs(fileItem) > 0)
   {
@@ -3622,30 +3632,36 @@ void CApplication::ActivateScreenSaver(bool forceType /*= false */)
   // disable screensaver lock from the login screen
   m_iScreenSaveLock = CServiceBroker::GetGUI()->GetWindowManager().GetActiveWindow() == WINDOW_LOGIN_SCREEN ? 1 : 0;
 
-  // set to Dim in the case of a dialog on screen or playing video
-  bool bUseDim = false;
+  m_screensaverIdInUse = settings->GetString(CSettings::SETTING_SCREENSAVER_MODE);
+
   if (!forceType)
   {
+    if (m_screensaverIdInUse == "screensaver.xbmc.builtin.dim" ||
+        m_screensaverIdInUse == "screensaver.xbmc.builtin.black" ||
+        m_screensaverIdInUse.empty())
+    {
+      return;
+    }
+
+    // Enforce Dim for special cases.
+    bool bUseDim = false;
     if (CServiceBroker::GetGUI()->GetWindowManager().HasModalDialog(true))
       bUseDim = true;
     else if (m_appPlayer.IsPlayingVideo() && settings->GetBool(CSettings::SETTING_SCREENSAVER_USEDIMONPAUSE))
       bUseDim = true;
     else if (CServiceBroker::GetPVRManager().GUIActions()->IsRunningChannelScan())
       bUseDim = true;
+
+    if (bUseDim)
+      m_screensaverIdInUse = "screensaver.xbmc.builtin.dim";
   }
 
-  if (bUseDim)
-    m_screensaverIdInUse = "screensaver.xbmc.builtin.dim";
-  else // Get Screensaver Mode
-    m_screensaverIdInUse = settings->GetString(CSettings::SETTING_SCREENSAVER_MODE);
-
   if (m_screensaverIdInUse == "screensaver.xbmc.builtin.dim" ||
-      m_screensaverIdInUse == "screensaver.xbmc.builtin.black")
+      m_screensaverIdInUse == "screensaver.xbmc.builtin.black" ||
+      m_screensaverIdInUse.empty())
   {
     return;
   }
-  else if (m_screensaverIdInUse.empty())
-    return;
   else if (CServiceBroker::GetAddonMgr().GetAddon(m_screensaverIdInUse, m_pythonScreenSaver, ADDON_SCREENSAVER))
   {
     std::string libPath = m_pythonScreenSaver->LibPath();
@@ -3741,6 +3757,9 @@ bool CApplication::OnMessage(CGUIMessage& message)
         ShowAppMigrationMessage();
 
         m_bInitializing = false;
+
+        if (message.GetSenderId() == WINDOW_SETTINGS_PROFILES)
+          g_application.ReloadSkin(false);
       }
       else if (message.GetParam1() == GUI_MSG_UPDATE_ITEM && message.GetItem())
       {
@@ -3896,6 +3915,8 @@ bool CApplication::OnMessage(CGUIMessage& message)
   case GUI_MSG_PLAYLISTPLAYER_STOPPED:
     m_itemCurrentFile->Reset();
     CServiceBroker::GetGUI()->GetInfoManager().ResetCurrentItem();
+    if (m_appPlayer.IsPlaying())
+      StopPlaying();
     PlaybackCleanup();
     return true;
 
@@ -4104,6 +4125,14 @@ void CApplication::ProcessSlow()
   {
     CheckShutdown();
   }
+
+#if defined(TARGET_POSIX)
+  if (CPlatformPosix::TestQuitFlag())
+  {
+    CLog::Log(LOGNOTICE, "Quitting due to POSIX signal");
+    CApplicationMessenger::GetInstance().PostMsg(TMSG_QUIT);
+  }
+#endif
 
   // check if we should restart the player
   CheckDelayedPlayerRestart();

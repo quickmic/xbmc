@@ -112,7 +112,7 @@ bool CAEBitstreamPacker::PackPause(CAEStreamInfo &info, unsigned int millis, boo
   return true;
 }
 
-unsigned int CAEBitstreamPacker::GetSize()
+unsigned int CAEBitstreamPacker::GetSize() const
 {
   return m_dataSize;
 }
@@ -161,6 +161,23 @@ void CAEBitstreamPacker::PackTrueHD(CAEStreamInfo &info, uint8_t* data, int size
     offset = (m_trueHDPos * TRUEHD_FRAME_OFFSET) + sizeof(mat_middle_code) - BURST_HEADER_SIZE + MAT_MIDDLE_CODE_OFFSET;
   else
     offset = (m_trueHDPos * TRUEHD_FRAME_OFFSET) - BURST_HEADER_SIZE;
+
+  int maxSize = TRUEHD_FRAME_OFFSET;
+  if (m_trueHDPos == 0)
+    maxSize -= sizeof(mat_start_code) + BURST_HEADER_SIZE;
+  else if (m_trueHDPos == 11)
+    maxSize -= -MAT_MIDDLE_CODE_OFFSET;
+  else if (m_trueHDPos == 12)
+    maxSize -= sizeof(mat_middle_code) + MAT_MIDDLE_CODE_OFFSET;
+  else if (m_trueHDPos == 23)
+    maxSize -= sizeof(mat_end_code) + (24 * TRUEHD_FRAME_OFFSET - MAT_FRAME_SIZE);
+
+  if (size > maxSize)
+  {
+    CLog::Log(LOGERROR, "CAEBitstreamPacker::PackTrueHD - truncating TrueHD frame of %d bytes",
+              size);
+    size = maxSize;
+  }
 
   memcpy(m_trueHD + offset, data, size);
 

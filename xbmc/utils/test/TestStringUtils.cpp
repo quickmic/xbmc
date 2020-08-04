@@ -11,6 +11,32 @@
 
 #include "gtest/gtest.h"
 
+enum class ECG
+{
+  A,
+  B
+};
+
+enum EG
+{
+  C,
+  D
+};
+
+namespace test_enum
+{
+enum class ECN
+{
+  A = 1,
+  B
+};
+enum EN
+{
+  C = 1,
+  D
+};
+}
+
 TEST(TestStringUtils, Format)
 {
   std::string refstr = "test 25 2.7 ff FF";
@@ -20,6 +46,35 @@ TEST(TestStringUtils, Format)
 
   varstr = StringUtils::Format("", "test", 25, 2.743f, 0x00ff, 0x00ff);
   EXPECT_STREQ("", varstr.c_str());
+}
+
+TEST(TestStringUtils, FormatEnum)
+{
+  const char* zero = "0";
+  const char* one = "1";
+
+  std::string varstr = StringUtils::Format("{}", ECG::A);
+  EXPECT_STREQ(zero, varstr.c_str());
+
+  varstr = StringUtils::Format("{}", EG::C);
+  EXPECT_STREQ(zero, varstr.c_str());
+
+  varstr = StringUtils::Format("{}", test_enum::ECN::A);
+  EXPECT_STREQ(one, varstr.c_str());
+
+  varstr = StringUtils::Format("{}", test_enum::EN::C);
+  EXPECT_STREQ(one, varstr.c_str());
+}
+
+TEST(TestStringUtils, FormatEnumWidth)
+{
+  const char* one = "01";
+
+  std::string varstr = StringUtils::Format("{:02d}", ECG::B);
+  EXPECT_STREQ(one, varstr.c_str());
+
+  varstr = StringUtils::Format("%02d", EG::D);
+  EXPECT_STREQ(one, varstr.c_str());
 }
 
 TEST(TestStringUtils, ToUpper)
@@ -329,7 +384,7 @@ TEST(TestStringUtils, RemoveCRLF)
 
 TEST(TestStringUtils, utf8_strlen)
 {
-  int ref, var;
+  size_t ref, var;
 
   ref = 9;
   var = StringUtils::utf8_strlen("ｔｅｓｔ＿ＵＴＦ８");
@@ -391,7 +446,7 @@ TEST(TestStringUtils, EmptyString)
 
 TEST(TestStringUtils, FindWords)
 {
-  int ref, var;
+  size_t ref, var;
 
   ref = 5;
   var = StringUtils::FindWords("test string", "string");
@@ -413,7 +468,7 @@ TEST(TestStringUtils, FindWords)
 
 TEST(TestStringUtils, FindWords_NonAscii)
 {
-  int ref, var;
+  size_t ref, var;
 
   ref = 6;
   var = StringUtils::FindWords("我的视频", "视频");

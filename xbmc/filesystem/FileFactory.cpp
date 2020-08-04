@@ -78,13 +78,13 @@ IFile* CFileFactory::CreateLoader(const CURL& url)
   if (!CWakeOnAccess::GetInstance().WakeUpHost(url))
     return NULL;
 
-  std::string strProtocol = url.GetProtocol();
-  if (!strProtocol.empty() && CServiceBroker::IsBinaryAddonCacheUp())
+  if (!url.GetProtocol().empty() && CServiceBroker::IsBinaryAddonCacheUp())
   {
-    StringUtils::ToLower(strProtocol);
     for (const auto& vfsAddon : CServiceBroker::GetVFSAddonCache().GetAddonInstances())
     {
-      if (vfsAddon->HasFiles() && vfsAddon->GetProtocols().find(strProtocol) != std::string::npos)
+      auto prots = StringUtils::Split(vfsAddon->GetProtocols(), "|");
+
+      if (vfsAddon->HasFiles() && std::find(prots.begin(), prots.end(), url.GetProtocol()) != prots.end())
         return new CVFSEntryIFileWrapper(vfsAddon);
     }
   }
@@ -137,7 +137,7 @@ IFile* CFileFactory::CreateLoader(const CURL& url)
   ||  url.IsProtocol("http")
   ||  url.IsProtocol("https")) return new CCurlFile();
   else if (url.IsProtocol("dav") || url.IsProtocol("davs")) return new CDAVFile();
-  else if (url.IsProtocol("shout")) return new CShoutcastFile();
+  else if (url.IsProtocol("shout") || url.IsProtocol("shouts")) return new CShoutcastFile();
 #ifdef HAS_FILESYSTEM_SMB
 #ifdef TARGET_WINDOWS
   else if (url.IsProtocol("smb")) return new CWin32SMBFile();

@@ -1,61 +1,64 @@
 /*
- *  Copyright (C) 2005-2018 Team Kodi
+ *  Copyright (C) 2005-2020 Team Kodi
  *  This file is part of Kodi - https://kodi.tv
  *
  *  SPDX-License-Identifier: GPL-2.0-or-later
  *  See LICENSES/README.md for more information.
  */
 
-#include <cstdlib>
-
 #include "FileItem.h"
+
+#include "CueDocument.h"
 #include "ServiceBroker.h"
-#include "guilib/LocalizeStrings.h"
-#include "utils/StringUtils.h"
-#include "utils/URIUtils.h"
-#include "utils/Archive.h"
+#include "URL.h"
 #include "Util.h"
-#include "playlists/PlayListFactory.h"
-#include "utils/Crc32.h"
+#include "events/IEvent.h"
+#include "filesystem/CurlFile.h"
 #include "filesystem/Directory.h"
 #include "filesystem/File.h"
-#include "filesystem/StackDirectory.h"
-#include "filesystem/CurlFile.h"
 #include "filesystem/MultiPathDirectory.h"
 #include "filesystem/MusicDatabaseDirectory.h"
+#include "filesystem/StackDirectory.h"
 #include "filesystem/VideoDatabaseDirectory.h"
 #include "filesystem/VideoDatabaseDirectory/QueryParams.h"
-#include "games/addons/GameClient.h"
 #include "games/GameUtils.h"
+#include "games/addons/GameClient.h"
 #include "games/tags/GameInfoTag.h"
-#include "music/tags/MusicInfoTagLoaderFactory.h"
-#include "CueDocument.h"
-#include "video/VideoDatabase.h"
+#include "guilib/LocalizeStrings.h"
+#include "media/MediaLockState.h"
+#include "music/Album.h"
+#include "music/Artist.h"
 #include "music/MusicDatabase.h"
+#include "music/tags/MusicInfoTag.h"
+#include "music/tags/MusicInfoTagLoaderFactory.h"
+#include "pictures/PictureInfoTag.h"
+#include "playlists/PlayListFactory.h"
+#include "pvr/PVRManager.h"
 #include "pvr/channels/PVRChannel.h"
+#include "pvr/channels/PVRChannelGroupsContainer.h"
 #include "pvr/epg/Epg.h"
 #include "pvr/recordings/PVRRecording.h"
 #include "pvr/timers/PVRTimerInfoTag.h"
-#include "video/Bookmark.h"
-#include "video/VideoInfoTag.h"
-#include "threads/SingleLock.h"
-#include "music/tags/MusicInfoTag.h"
-#include "pictures/PictureInfoTag.h"
-#include "music/Artist.h"
-#include "music/Album.h"
-#include "URL.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
+#include "threads/SingleLock.h"
+#include "utils/Archive.h"
+#include "utils/Crc32.h"
 #include "utils/FileExtensionProvider.h"
-#include "utils/RegExp.h"
-#include "utils/log.h"
-#include "utils/Variant.h"
 #include "utils/Mime.h"
 #include "utils/Random.h"
-#include "events/IEvent.h"
+#include "utils/RegExp.h"
+#include "utils/StringUtils.h"
+#include "utils/URIUtils.h"
+#include "utils/Variant.h"
+#include "utils/log.h"
+#include "video/Bookmark.h"
+#include "video/VideoDatabase.h"
+#include "video/VideoInfoTag.h"
 
 #include <algorithm>
+#include <cstdlib>
 
 using namespace KODI;
 using namespace XFILE;
@@ -112,6 +115,20 @@ CFileItem::CFileItem(const CVideoInfoTag& movie)
   SetFromVideoInfoTag(movie);
 }
 
+namespace
+{
+  std::string GetEpgTagTitle(const std::shared_ptr<CPVREpgInfoTag>& epgTag)
+  {
+    if (CServiceBroker::GetPVRManager().IsParentalLocked(epgTag))
+      return g_localizeStrings.Get(19266); // Parental locked
+    else if (epgTag->Title().empty() &&
+             !CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool(CSettings::SETTING_EPG_HIDENOINFOAVAILABLE))
+      return g_localizeStrings.Get(19055); // no information available
+    else
+      return epgTag->Title();
+  }
+} // unnamed namespace
+
 void CFileItem::FillMusicInfoTag(const CPVRChannelPtr& channel, const CPVREpgInfoTagPtr& tag)
 {
   if (channel && channel->IsRadio() && !HasMusicInfoTag())
@@ -120,7 +137,7 @@ void CFileItem::FillMusicInfoTag(const CPVRChannelPtr& channel, const CPVREpgInf
 
     if (tag)
     {
-      musictag->SetTitle(tag->Title());
+      musictag->SetTitle(GetEpgTagTitle(tag));
       musictag->SetGenre(tag->Genre());
       musictag->SetDuration(tag->GetDuration());
     }
@@ -144,15 +161,23 @@ CFileItem::CFileItem(const CPVREpgInfoTagPtr& tag)
   m_bIsFolder = false;
   m_epgInfoTag = tag;
   m_strPath = tag->Path();
-  SetLabel(tag->Title());
+  SetLabel(GetEpgTagTitle(tag));
   m_dateTime = tag->StartAsLocalTime();
 
   if (!tag->Icon().empty())
     SetIconImage(tag->Icon());
-  else if (tag->HasChannel() && !tag->Channel()->IconPath().empty())
-    SetIconImage(tag->Channel()->IconPath());
+  else
+  {
+    const std::shared_ptr<CPVRChannel> channel = CServiceBroker::GetPVRManager().ChannelGroups()->GetChannelForEpgTag(tag);
+    if (channel)
+    {
+      if (!channel->IconPath().empty())
+        SetIconImage(channel->IconPath());
 
-  FillMusicInfoTag(tag->Channel(), tag);
+      FillMusicInfoTag(channel, tag);
+    }
+  }
+
   FillInMimeType(false);
 }
 
@@ -469,7 +494,7 @@ void CFileItem::Initialize()
   m_idepth = 1;
   m_iLockMode = LOCK_MODE_EVERYONE;
   m_iBadPwdCount = 0;
-  m_iHasLock = 0;
+  m_iHasLock = LOCK_STATE_NO_LOCK;
   m_bCanQueue = true;
   m_specialSort = SortSpecialNone;
   m_doContentLookup = true;
@@ -1172,6 +1197,16 @@ bool CFileItem::IsBluray() const
   CFileItem item = CFileItem(GetOpticalMediaPath(), false);
   
   return item.IsBDFile();
+}
+
+bool CFileItem::IsProtectedBlurayDisc() const
+{
+  std::string path;
+  path = URIUtils::AddFileToFolder(GetPath(), "AACS", "Unit_Key_RO.inf");
+  if (CFile::Exists(path))
+    return true;
+
+  return false;
 }
 
 bool CFileItem::IsCDDA() const
@@ -2885,8 +2920,17 @@ bool CFileItemList::Save(int windowID)
   CLog::Log(LOGDEBUG,"Saving fileitems [%s]", CURL::GetRedacted(GetPath()).c_str());
 
   CFile file;
-  if (file.OpenForWrite(GetDiscFileCache(windowID), true)) // overwrite always
+  std::string cachefile = GetDiscFileCache(windowID);
+  if (file.OpenForWrite(cachefile, true)) // overwrite always
   {
+    // Before caching save simplified cache file name in every item so the cache file can be
+    // identifed and removed if the item is updated. List path and options (used for file
+    // name when list cached) can not be accurately derived from item path
+    StringUtils::Replace(cachefile, "special://temp/archive_cache/", "");
+    StringUtils::Replace(cachefile, ".fi", "");
+    for (auto item : m_items)
+      item->SetProperty("cachefilename", cachefile);
+
     CArchive ar(&file, CArchive::store);
     ar << *this;
     CLog::Log(LOGDEBUG,"  -- items: %i, sort method: %i, ascending: %s", iSize, m_sortDescription.sortBy, m_sortDescription.sortOrder == SortOrderAscending ? "true" : "false");
@@ -2900,12 +2944,22 @@ bool CFileItemList::Save(int windowID)
 
 void CFileItemList::RemoveDiscCache(int windowID) const
 {
-  std::string cacheFile(GetDiscFileCache(windowID));
+  RemoveDiscCache(GetDiscFileCache(windowID));
+}
+
+void CFileItemList::RemoveDiscCache(const std::string& cacheFile) const
+{
   if (CFile::Exists(cacheFile))
   {
     CLog::Log(LOGDEBUG,"Clearing cached fileitems [%s]", CURL::GetRedacted(GetPath()).c_str());
     CFile::Delete(cacheFile);
   }
+}
+
+void CFileItemList::RemoveDiscCacheCRC(const std::string& crc) const
+{
+  std::string cachefile = StringUtils::Format("special://temp/archive_cache/%s.fi", crc);
+  RemoveDiscCache(cachefile);
 }
 
 std::string CFileItemList::GetDiscFileCache(int windowID) const
@@ -3169,10 +3223,11 @@ std::string CFileItem::GetMovieName(bool bUseFolderNames /* = false */) const
       return title;
   }
 
-  std::string strMovieName = GetBaseMoviePath(bUseFolderNames);
-
-  if (URIUtils::IsStack(strMovieName))
-    strMovieName = CStackDirectory::GetStackedTitlePath(strMovieName);
+  std::string strMovieName;
+  if (URIUtils::IsStack(m_strPath))
+    strMovieName = CStackDirectory::GetStackedTitlePath(m_strPath);
+  else
+    strMovieName = GetBaseMoviePath(bUseFolderNames);
 
   URIUtils::RemoveSlashAtEnd(strMovieName);
 
@@ -3597,7 +3652,7 @@ CFileItem CFileItem::GetItemToPlay() const
 {
   if (HasEPGInfoTag())
   {
-    const CPVRChannelPtr channel(GetEPGInfoTag()->Channel());
+    const std::shared_ptr<CPVRChannel> channel = CServiceBroker::GetPVRManager().ChannelGroups()->GetChannelForEpgTag(GetEPGInfoTag());
     if (channel)
       return CFileItem(channel);
   }

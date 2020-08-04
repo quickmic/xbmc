@@ -650,6 +650,14 @@ bool CPVRManager::IsPlayingEpgTag(const CPVREpgInfoTagPtr &epgTag) const
   return bReturn;
 }
 
+bool CPVRManager::IsPlayingChannel(int iClientID, int iUniqueChannelID) const
+{
+  if (m_playingChannel)
+    return m_playingClientId == iClientID && m_iplayingChannelUniqueID == iUniqueChannelID;
+
+  return false;
+}
+
 CPVRChannelPtr CPVRManager::GetPlayingChannel(void) const
 {
   return m_playingChannel;
@@ -678,7 +686,7 @@ int CPVRManager::GetPlayingClientID(void) const
 bool CPVRManager::IsRecordingOnPlayingChannel(void) const
 {
   const CPVRChannelPtr currentChannel = GetPlayingChannel();
-  return currentChannel && currentChannel->IsRecording();
+  return currentChannel && m_timers && m_timers->IsRecordingOnChannel(*currentChannel);
 }
 
 bool CPVRManager::CanRecordOnPlayingChannel(void) const
@@ -693,19 +701,33 @@ void CPVRManager::RestartParentalTimer()
     m_parentalTimer->StartZero();
 }
 
-bool CPVRManager::IsParentalLocked(const CPVRChannelPtr &channel)
+bool CPVRManager::IsParentalLocked(const std::shared_ptr<CPVREpgInfoTag>& epgTag) const
 {
-  bool bReturn(false);
-  if (!IsStarted())
-    return bReturn;
-  CPVRChannelPtr currentChannel(GetPlayingChannel());
+  return m_channelGroups &&
+         epgTag &&
+         IsCurrentlyParentalLocked(m_channelGroups->GetByUniqueID(epgTag->UniqueChannelID(), epgTag->ClientID()),
+                                   epgTag->IsParentalLocked());
+}
 
-  if (// different channel
+bool CPVRManager::IsParentalLocked(const std::shared_ptr<CPVRChannel>& channel) const
+{
+  return channel &&
+         IsCurrentlyParentalLocked(channel, channel->IsLocked());
+}
+
+bool CPVRManager::IsCurrentlyParentalLocked(const std::shared_ptr<CPVRChannel>& channel, bool bGenerallyLocked) const
+{
+  bool bReturn = false;
+
+  if (!channel || !bGenerallyLocked)
+    return bReturn;
+
+  const std::shared_ptr<CPVRChannel> currentChannel = GetPlayingChannel();
+
+  if (// if channel in question is currently playing it must be currently unlocked.
       (!currentChannel || channel != currentChannel) &&
       // parental control enabled
-      m_settings.GetBoolValue(CSettings::SETTING_PVRPARENTAL_ENABLED) &&
-      // channel is locked
-      channel && channel->IsLocked())
+      m_settings.GetBoolValue(CSettings::SETTING_PVRPARENTAL_ENABLED))
   {
     float parentalDurationMs = m_settings.GetIntValue(CSettings::SETTING_PVRPARENTAL_DURATION) * 1000.0f;
     bReturn = m_parentalTimer &&
@@ -777,6 +799,7 @@ void CPVRManager::OnPlaybackStarted(const CFileItemPtr item)
   m_playingRecording.reset();
   m_playingEpgTag.reset();
   m_playingClientId = -1;
+  m_iplayingChannelUniqueID = -1;
   m_strPlayingClientName.clear();
 
   if (item->HasPVRChannelInfoTag())
@@ -785,6 +808,7 @@ void CPVRManager::OnPlaybackStarted(const CFileItemPtr item)
 
     m_playingChannel = channel;
     m_playingClientId = m_playingChannel->ClientID();
+    m_iplayingChannelUniqueID = m_playingChannel->UniqueID();
 
     SetPlayingGroup(channel);
 
@@ -856,18 +880,21 @@ void CPVRManager::OnPlaybackStopped(const CFileItemPtr item)
 
     m_playingChannel.reset();
     m_playingClientId = -1;
+    m_iplayingChannelUniqueID = -1;
     m_strPlayingClientName.clear();
   }
   else if (item->HasPVRRecordingInfoTag() && item->GetPVRRecordingInfoTag() == m_playingRecording)
   {
     m_playingRecording.reset();
     m_playingClientId = -1;
+    m_iplayingChannelUniqueID = -1;
     m_strPlayingClientName.clear();
   }
   else if (item->HasEPGInfoTag() && item->GetEPGInfoTag() == m_playingEpgTag)
   {
     m_playingEpgTag.reset();
     m_playingClientId = -1;
+    m_iplayingChannelUniqueID = -1;
     m_strPlayingClientName.clear();
   }
 

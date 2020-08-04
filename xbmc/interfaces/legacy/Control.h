@@ -1282,13 +1282,39 @@ namespace XBMCAddon
       ///-----------------------------------------------------------------------
       /// Clear all ListItems in this control list.
       ///
+      /// @warning Calling `reset()` will destroy any `ListItem` objects in the
+      ///          `ControlList` if not hold by any other class. Make sure you
+      ///          you don't call `addItems()` with the previous `ListItem` references
+      ///          after calling `reset()`. If you need to preserve the `ListItem` objects after
+      ///          `reset()` make sure you store them as members of your `WindowXML` class (see examples).
+      ///
       ///
       ///-----------------------------------------------------------------------
       ///
-      /// **Example:**
+      /// **Examples:**
       /// ~~~~~~~~~~~~~{.py}
       /// ...
       /// cList.reset()
+      /// ...
+      /// ~~~~~~~~~~~~~
+      ///
+      /// The below example shows you how you can reset the `ControlList` but this time avoiding `ListItem` object
+      /// destruction. The example assumes `self` as a `WindowXMLDialog` instance containing a `ControlList`
+      /// with id = 800. The class preserves the `ListItem` objects in a class member variable.
+      ///
+      /// ~~~~~~~~~~~~~{.py}
+      /// ...
+      /// # Get all the ListItem objects in the control
+      /// self.list_control = self.getControl(800) # ControlList object
+      /// self.listitems = [self.list_control.getListItem(item) for item in range(0, self.list_control.size())]
+      /// # Reset the ControlList control
+      /// self.list_control.reset()
+      /// #
+      /// # do something with your ListItem objects here (e.g. sorting.)
+      /// # ...
+      /// #
+      /// # Add them again to the ControlList
+      /// self.list_control.addItems(self.listitems)
       /// ...
       /// ~~~~~~~~~~~~~
       ///
@@ -1816,6 +1842,21 @@ namespace XBMCAddon
     /// ...
     /// ~~~~~~~~~~~~~
     ///
+    /// As stated above, the GUI control is only created once added to a window. The example
+    /// below shows how a ControlTextBox can be created, added to the current window and
+    /// have some of its properties changed.
+    ///
+    /// /// **Extended example:**
+    /// ~~~~~~~~~~~~~{.py}
+    /// ...
+    /// textbox = xbmcgui.ControlTextBox(100, 250, 300, 300, textColor='0xFFFFFFFF')
+    /// window = xbmcgui.Window(xbmcgui.getCurrentWindowId())
+    /// window.addControl(textbox)
+    /// textbox.setText("My Text Box")
+    /// textbox.scroll()
+    /// ...
+    /// ~~~~~~~~~~~~~
+    ///
     class ControlTextBox : public Control
     {
     public:
@@ -1830,9 +1871,11 @@ namespace XBMCAddon
       /// @brief \python_func{ setText(text) }
       ///-----------------------------------------------------------------------
       /// Set's the text for this textbox.
+      /// \anchor python_xbmcgui_control_textbox_settext
       ///
-      /// @param text                 string or unicode - text string.
+      /// @param text                 string  - text string.
       ///
+      /// @note setText only has effect after the control is added to a window
       ///
       ///--------------------------------------------------------------------------
       ///
@@ -1859,6 +1902,9 @@ namespace XBMCAddon
       ///
       /// @return                       To get text from box
       ///
+      /// @note getText only works after you add the control to a window
+      /// and set the control text (using \ref python_xbmcgui_control_textbox_settext
+      /// "setText").
       ///
       ///-----------------------------------------------------------------------
       ///
@@ -1883,6 +1929,7 @@ namespace XBMCAddon
       ///-----------------------------------------------------------------------
       /// Clear's this textbox.
       ///
+      /// @note reset only works after you add the control to a window.
       ///
       ///-----------------------------------------------------------------------
       ///
@@ -1909,6 +1956,7 @@ namespace XBMCAddon
       ///
       /// @param id                 integer - position to scroll to.
       ///
+      /// @note scroll() only works after the control is added to a window.
       ///
       ///-----------------------------------------------------------------------
       ///
@@ -1937,6 +1985,7 @@ namespace XBMCAddon
       /// @param time                  integer - Scroll time (in ms)
       /// @param repeat                integer - Repeat time
       ///
+      /// @note autoScroll only works after you add the control to a window.
       ///
       ///-----------------------------------------------------------------------
       /// @python_v15 New function added.

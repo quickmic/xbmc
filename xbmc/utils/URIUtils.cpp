@@ -323,15 +323,15 @@ bool URIUtils::GetParentPath(const std::string& strPath, std::string& strParent)
     CFileItemList items;
     if (!dir.GetDirectory(url, items))
       return false;
-    items[0]->m_strDVDLabel = GetDirectory(items[0]->GetPath());
-    if (IsProtocol(items[0]->m_strDVDLabel, "rar") || IsProtocol(items[0]->m_strDVDLabel, "zip"))
-      GetParentPath(items[0]->m_strDVDLabel, strParent);
+    CURL url2(GetDirectory(items[0]->GetPath()));
+    if (HasParentInHostname(url2))
+      GetParentPath(url2.Get(), strParent);
     else
-      strParent = items[0]->m_strDVDLabel;
+      strParent = url2.Get();
     for( int i=1;i<items.Size();++i)
     {
       items[i]->m_strDVDLabel = GetDirectory(items[i]->GetPath());
-      if (IsProtocol(items[0]->m_strDVDLabel, "rar") || IsProtocol(items[0]->m_strDVDLabel, "zip"))
+      if (HasParentInHostname(url2))
         items[i]->SetPath(GetParentPath(items[i]->m_strDVDLabel));
       else
         items[i]->SetPath(items[i]->m_strDVDLabel);
@@ -1371,7 +1371,8 @@ std::string URIUtils::resolvePath(const std::string &path)
   // put together the path
   realPath += StringUtils::Join(realParts, delim);
   // re-add any / or \ at the end
-  if (path.at(path.size() - 1) == delim.at(0) && realPath.at(realPath.size() - 1) != delim.at(0))
+  if (path.at(path.size() - 1) == delim.at(0) &&
+      realPath.size() > 0 && realPath.at(realPath.size() - 1) != delim.at(0))
     realPath += delim;
 
   return realPath;
@@ -1415,9 +1416,4 @@ bool URIUtils::UpdateUrlEncoding(std::string &strFilename)
 
   strFilename = newFilename;
   return true;
-}
-
-bool URIUtils::IsUsingFastSwitch(const std::string& strFile)
-{
-  return IsUDP(strFile) || IsTCP(strFile) || IsPVRChannel(strFile);
 }

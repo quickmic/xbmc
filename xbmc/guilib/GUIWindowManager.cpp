@@ -776,9 +776,18 @@ void CGUIWindowManager::ActivateWindow_Internal(int iWindowID, const std::vector
   // debug
   CLog::Log(LOGDEBUG, "Activating window ID: %i", iWindowID);
 
+  // make sure we check mediasources from home
+  if (GetActiveWindow() == WINDOW_HOME)
+    g_passwordManager.strMediasourcePath = !params.empty() ? params[0] : "";
+  else
+    g_passwordManager.strMediasourcePath = "";
+
   if (!g_passwordManager.CheckMenuLock(iWindowID))
   {
-    CLog::Log(LOGERROR, "MasterCode is Wrong: Window with id %d will not be loaded! Enter a correct MasterCode!", iWindowID);
+    CLog::Log(LOGERROR,
+              "MasterCode or Mediasource-code is wrong: Window with id {} will not be loaded! "
+              "Enter a correct code!",
+              iWindowID);
     if (GetActiveWindow() == WINDOW_INVALID && iWindowID != WINDOW_HOME)
       ActivateWindow(WINDOW_HOME);
     return;
@@ -1289,8 +1298,11 @@ CGUIWindow* CGUIWindowManager::GetWindow(int id) const
 
 bool CGUIWindowManager::ProcessRenderLoop(bool renderOnly)
 {
+  bool renderGui = true;
+
   if (g_application.IsCurrentThread() && m_pCallback)
   {
+    renderGui = m_pCallback->GetRenderGUI();
     m_iNested++;
     if (!renderOnly)
       m_pCallback->Process();
@@ -1298,7 +1310,7 @@ bool CGUIWindowManager::ProcessRenderLoop(bool renderOnly)
     m_pCallback->Render();
     m_iNested--;
   }
-  if (g_application.m_bStop)
+  if (g_application.m_bStop || !renderGui)
     return false;
   else
     return true;
@@ -1670,8 +1682,10 @@ void CGUIWindowManager::CloseWindowSync(CGUIWindow *window, int nextWindowID /*=
   }
 
   window->Close(false, nextWindowID);
-  while (window->IsAnimating(ANIM_TYPE_WINDOW_CLOSE))
-    ProcessRenderLoop(true);
+
+  bool renderLoopProcessed = true;
+  while (window->IsAnimating(ANIM_TYPE_WINDOW_CLOSE) && renderLoopProcessed)
+    renderLoopProcessed = ProcessRenderLoop(true);
 }
 
 #ifdef _DEBUG

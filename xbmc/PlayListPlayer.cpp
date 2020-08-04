@@ -25,8 +25,10 @@
 #include "interfaces/AnnouncementManager.h"
 #include "input/Key.h"
 #include "URL.h"
+#include "utils/URIUtils.h"
 #include "messaging/ApplicationMessenger.h"
 #include "filesystem/VideoDatabaseFile.h"
+#include "filesystem/PluginDirectory.h"
 #include "messaging/helpers/DialogOKHelper.h"
 #include "ServiceBroker.h"
 
@@ -860,6 +862,10 @@ void PLAYLIST::CPlayListPlayer::OnApplicationMessage(KODI::MESSAGING::ThreadMess
     // first check if we were called from the PlayFile() function
     if (pMsg->lpVoid && pMsg->param2 == 0)
     {
+      // Discard the current playlist, if TMSG_MEDIA_PLAY gets posted with just a single item.
+      // Otherwise items may fail to play, when started while a playlist is playing.
+      Reset();
+
       CFileItem *item = static_cast<CFileItem*>(pMsg->lpVoid);
       g_application.PlayFile(*item, "", pMsg->param1 != 0);
       delete item;
@@ -892,6 +898,13 @@ void PLAYLIST::CPlayListPlayer::OnApplicationMessage(KODI::MESSAGING::ThreadMess
         if (list->Size() == 1 && !(*list)[0]->IsPlayList())
         {
           CFileItemPtr item = (*list)[0];
+          // if the item is a plugin we need to resolve the URL to ensure the infotags are filled.
+          // resolve only for a maximum of 5 times to avoid deadlocks (plugin:// paths can resolve to plugin:// paths)
+          for (int i = 0; URIUtils::IsPlugin(item->GetDynPath()) && i < 5; ++i)
+          {
+            if (!XFILE::CPluginDirectory::GetPluginResult(item->GetDynPath(), *item, true))
+              return;
+          }
           if (item->IsAudio() || item->IsVideo())
             Play(item, pMsg->strParam);
           else

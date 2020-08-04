@@ -16,11 +16,18 @@
 #include <vector>
 
 extern "C" {
-#include "libavformat/avformat.h"
+#include <libavformat/avformat.h>
 }
 
 class CDVDDemuxFFmpeg;
 class CURL;
+
+enum class TRANSPORT_STREAM_STATE
+{
+  NONE,
+  READY,
+  NOTREADY,
+};
 
 class CDemuxStreamVideoFFmpeg : public CDemuxStreamVideo
 {
@@ -76,7 +83,7 @@ public:
   CDVDDemuxFFmpeg();
   ~CDVDDemuxFFmpeg() override;
 
-  bool Open(std::shared_ptr<CDVDInputStream> pInput, bool streaminfo = true, bool fileinfo = false);
+  bool Open(std::shared_ptr<CDVDInputStream> pInput, bool fileinfo);
   void Dispose();
   bool Reset() override ;
   void Flush() override;
@@ -116,8 +123,10 @@ protected:
   void AddStream(int streamIdx, CDemuxStream* stream);
   void CreateStreams(unsigned int program = UINT_MAX);
   void DisposeStreams();
-  void ParsePacket(AVPacket *pkt);
-  bool IsVideoReady();
+  void ParsePacket(AVPacket* pkt);
+  TRANSPORT_STREAM_STATE TransportStreamAudioState();
+  TRANSPORT_STREAM_STATE TransportStreamVideoState();
+  bool IsTransportStreamReady();
   void ResetVideoStreams();
   AVDictionary *GetFFMpegOptionsFromInput();
   double ConvertTimestamp(int64_t pts, int den, int num);
@@ -145,6 +154,8 @@ protected:
   unsigned int m_program;
   unsigned int m_streamsInProgram;
   unsigned int m_newProgram;
+  unsigned int m_initialProgramNumber;
+  int m_seekStream;
 
   XbmcThreads::EndTime  m_timeout;
 
@@ -158,7 +169,8 @@ protected:
   }m_pkt;
 
   bool m_streaminfo;
-  bool m_checkvideo;
+  bool m_reopen = false;
+  bool m_checkTransportStream;
   int m_displayTime = 0;
   double m_dtsAtDisplayTime;
   bool m_seekToKeyFrame = false;

@@ -66,6 +66,9 @@ typedef enum
 - (void) setIOSNowPlayingInfo:(NSDictionary *)info;
 - (void) sendKey: (XBMCKey) key;
 - (void) observeDefaultCenterStuff: (NSNotification *) notification;
+- (CGRect)fullscreenSubviewFrame;
+- (void)onXbmcAlive;
+- (void)setGUIInsetsFromMainThread:(BOOL)isMainThread;
 - (void) setFramebuffer;
 - (bool) presentFramebuffer;
 - (CGSize) getScreenSize;

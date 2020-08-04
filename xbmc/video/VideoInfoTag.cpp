@@ -469,8 +469,6 @@ void CVideoInfoTag::Archive(CArchive& ar)
     ar >> m_strAlbum;
     ar >> m_artist;
     ar >> m_playCount;
-    //re-evaluate the playcount
-    m_playCount = PLAYCOUNT_NOT_SET;
     ar >> m_lastPlayed;
     ar >> m_iTop250;
     ar >> m_iSeason;
@@ -835,7 +833,10 @@ void CVideoInfoTag::ParseNative(const TiXmlElement* movie, bool prioritise)
         r.rating = r.rating / max_value * 10; // Normalise the Movie Rating to between 1 and 10
       SetRating(r, name);
       bool isDefault = false;
-      if ((child->QueryBoolAttribute("default", &isDefault) == TIXML_SUCCESS) && isDefault)
+      // guard against assert in tinyxml
+      const char* rAtt = child->Attribute("default", static_cast<int*>(nullptr));
+      if (rAtt && strlen(rAtt) != 0 &&
+          (child->QueryBoolAttribute("default", &isDefault) == TIXML_SUCCESS) && isDefault)
         m_strDefaultRating = name;
     }
   }
